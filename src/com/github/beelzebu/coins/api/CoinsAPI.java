@@ -54,7 +54,7 @@ public final class CoinsAPI {
         if (uuid == null) {
             return -1;
         }
-        return PLUGIN.getCache().getCoins(uuid).orElseGet(() -> PLUGIN.getStorageProvider().getCoins(UUIDUtil.getUniqueId(name)));
+        return PLUGIN.getCache().getCoins(uuid).orElseGet(() -> PLUGIN.getStorageProvider().getCoins(uuid));
     }
 
     /**
