@@ -34,6 +34,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -48,15 +49,15 @@ public abstract class SQLDatabase implements StorageProvider {
 
     protected final CoinsPlugin plugin;
     protected final String prefix;
-    protected final String dataTable;
-    protected final String multipliersTable;
+    public static String DATA_TABLE;
+    public static String MULTIPLIERS_TABLE;
     protected HikariDataSource ds;
 
     public SQLDatabase(CoinsPlugin plugin) {
         this.plugin = plugin;
         prefix = plugin.getStorageProvider().getStorageType().equals(StorageType.SQLITE) ? "" : plugin.getConfig().getString("MySQL.Prefix");
-        dataTable = prefix + plugin.getConfig().getString("MySQL.Data Table", "data");
-        multipliersTable = prefix + plugin.getConfig().getString("MySQL.Multipliers Table", "multipliers");
+        DATA_TABLE = prefix + plugin.getConfig().getString("MySQL.Data Table", "data");
+        MULTIPLIERS_TABLE = prefix + plugin.getConfig().getString("MySQL.Multipliers Table", "multipliers");
     }
 
     @Override
@@ -231,7 +232,7 @@ public abstract class SQLDatabase implements StorageProvider {
 
     @Override
     public Multiplier getMultiplier(int id) {
-        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_MULTIPLIER, id); ResultSet res = ps.executeQuery()) {
+        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_MULTIPLIER_ID, id); ResultSet res = ps.executeQuery()) {
             if (res.next()) {
                 return MultiplierBuilder.newBuilder(res.getString("server"), getDataFromResultSet(res))
                         .setID(res.getInt("id"))
@@ -247,9 +248,51 @@ public abstract class SQLDatabase implements StorageProvider {
     }
 
     @Override
-    public Set<Multiplier> getMultipliers(UUID uuid) {
+    public Collection<Multiplier> getMultipliers() {
         Set<Multiplier> multipliers = new LinkedHashSet<>();
-        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_ALL_MULTIPLIERS_PLAYER, uuid); ResultSet res = ps.executeQuery()) {
+        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_MULTIPLIERS_IDS); ResultSet res = ps.executeQuery()) {
+            while (res.next()) {
+                multipliers.add(getMultiplier(res.getInt("id")));
+            }
+        } catch (SQLException ex) {
+            plugin.log("An error has occurred getting all the multipliers");
+            plugin.debug(ex);
+        }
+        return multipliers;
+    }
+
+    @Override
+    public Collection<Multiplier> getMultipliers(String server) {
+        Set<Multiplier> multipliers = new LinkedHashSet<>();
+        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_MULTIPLIERS_IDS_SERVER, server); ResultSet res = ps.executeQuery()) {
+            while (res.next()) {
+                multipliers.add(getMultiplier(res.getInt("id")));
+            }
+        } catch (SQLException ex) {
+            plugin.log("An error has occurred getting all the multipliers for a specific server");
+            plugin.debug(ex);
+        }
+        return multipliers;
+    }
+
+    @Override
+    public Collection<Multiplier> getMultipliers(String server, boolean enabled) {
+        Set<Multiplier> multipliers = new LinkedHashSet<>();
+        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_MULTIPLIERS_IDS_SERVER_ENABLED, server, enabled); ResultSet res = ps.executeQuery()) {
+            while (res.next()) {
+                multipliers.add(getMultiplier(res.getInt("id")));
+            }
+        } catch (SQLException ex) {
+            plugin.log("An error has occurred getting enabled/disabled multipliers for a specific server");
+            plugin.debug(ex);
+        }
+        return multipliers;
+    }
+
+    @Override
+    public Collection<Multiplier> getMultipliersFor(UUID uuid) {
+        Set<Multiplier> multipliers = new LinkedHashSet<>();
+        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_MULTIPLIERS_IDS_PLAYER, uuid); ResultSet res = ps.executeQuery()) {
             while (res.next()) {
                 multipliers.add(getMultiplier(res.getInt("id")));
             }
@@ -261,9 +304,23 @@ public abstract class SQLDatabase implements StorageProvider {
     }
 
     @Override
-    public Set<Multiplier> getMultipliers(UUID uuid, String server) {
+    public Collection<Multiplier> getMultipliersFor(UUID uuid, boolean enabled) {
         Set<Multiplier> multipliers = new LinkedHashSet<>();
-        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_ALL_MULTIPLIERS_SERVER, uuid, server); ResultSet res = ps.executeQuery()) {
+        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_MULTIPLIERS_IDS_PLAYER_ENABLED, uuid, enabled); ResultSet res = ps.executeQuery()) {
+            while (res.next()) {
+                multipliers.add(getMultiplier(res.getInt("id")));
+            }
+        } catch (SQLException ex) {
+            plugin.log("An error has occurred getting enabled/disabled multipliers for " + uuid);
+            plugin.debug(ex);
+        }
+        return multipliers;
+    }
+
+    @Override
+    public Collection<Multiplier> getMultipliersFor(UUID uuid, String server) {
+        Set<Multiplier> multipliers = new LinkedHashSet<>();
+        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_MULTIPLIERS_IDS_PLAYER_SERVER, uuid, server); ResultSet res = ps.executeQuery()) {
             while (res.next()) {
                 multipliers.add(getMultiplier(res.getInt("id")));
             }
@@ -275,14 +332,14 @@ public abstract class SQLDatabase implements StorageProvider {
     }
 
     @Override
-    public Set<Multiplier> getMultipliers() {
+    public Collection<Multiplier> getMultipliersFor(UUID uuid, String server, boolean enabled) {
         Set<Multiplier> multipliers = new LinkedHashSet<>();
-        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_ALL_MULTIPLIERS); ResultSet res = ps.executeQuery()) {
+        try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_MULTIPLIERS_IDS_PLAYER_SERVER_ENABLED, uuid, server, enabled); ResultSet res = ps.executeQuery()) {
             while (res.next()) {
                 multipliers.add(getMultiplier(res.getInt("id")));
             }
         } catch (SQLException ex) {
-            plugin.log("An error has occurred getting all the multipliers");
+            plugin.log("An error has occurred getting enabled/disabled multipliers for " + uuid + " in server " + server);
             plugin.debug(ex);
         }
         return multipliers;
@@ -348,11 +405,11 @@ public abstract class SQLDatabase implements StorageProvider {
     }
 
     String getDataTable() {
-        return dataTable;
+        return DATA_TABLE;
     }
 
     String getMultipliersTable() {
-        return multipliersTable;
+        return MULTIPLIERS_TABLE;
     }
 
     private UUID getUUID(Connection c, String name) throws SQLException {

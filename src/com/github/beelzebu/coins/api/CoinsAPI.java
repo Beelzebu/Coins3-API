@@ -24,10 +24,10 @@ import com.github.beelzebu.coins.api.utils.CoinsSet;
 import com.github.beelzebu.coins.api.utils.UUIDUtil;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
+import java.util.Collection;
 import java.util.Objects;
-import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 
 /**
@@ -340,67 +340,21 @@ public final class CoinsAPI {
     }
 
     /**
-     * Get all enabled multipliers for this server.
-     *
-     * @return The active multiplier for this server.
-     */
-    public static Set<Multiplier> getMultipliers() {
-        return getMultipliers(PLUGIN.getConfig().getString("Multipliers.Server", "default"));
-    }
-
-    public static Set<Multiplier> getMultipliers(MultiplierFilter filter) {
-        return getMultipliers().stream().filter(filter.getPredicate()).collect(Collectors.toSet());
-    }
-
-    /**
-     * Get all enabled multipliers in this server.
-     *
-     * @param server The server to modify and get info about multiplier.
-     * @return The active multiplier for the specified server can be null;
-     */
-    public static Set<Multiplier> getMultipliers(@Nonnull String server) {
-        return PLUGIN.getCache().getMultipliers(server);
-    }
-
-    /**
-     * Get a multiplier from the storageProvider by his ID and add it to the cache.
+     * Get a multiplier from the database by his ID and add it to the cache if it wasn't already cached.
      *
      * @param id The ID of the multiplier.
      * @return The multiplier from the Cache.
      */
     public static Multiplier getMultiplier(int id) {
-        return PLUGIN.getCache().getMultiplier(id).orElse(PLUGIN.getStorageProvider().getMultiplier(id));
-    }
-
-    /**
-     * Get all multipliers for a player from the storageProvider.
-     *
-     * @param uuid player to get the multipliers from the storageProvider.
-     * @return all multipliers that this player have.
-     */
-    public static Set<Multiplier> getAllMultipliersFor(@Nonnull UUID uuid) {
-        return PLUGIN.getStorageProvider().getMultipliers(uuid);
-    }
-
-    /**
-     * Get all the multipliers for a player in the current server.
-     *
-     * @param uuid player to get multipliers from the storageProvider.
-     * @return multipliers of the player in this server.
-     */
-    public static Set<Multiplier> getMultipliersFor(@Nonnull UUID uuid) {
-        return PLUGIN.getStorageProvider().getMultipliers(uuid, PLUGIN.getConfig().getServerName());
-    }
-
-    /**
-     * Get all multipliers for a player in the specified server.
-     *
-     * @param uuid   player to get multipliers from the storageProvider.
-     * @param server where we should get the multipliers.
-     * @return multipliers of the player in that server.
-     */
-    public static Set<Multiplier> getMultipliersFor(@Nonnull UUID uuid, @Nonnull String server) {
-        return PLUGIN.getStorageProvider().getMultipliers(uuid, server);
+        Optional<Multiplier> optionalMultiplier = PLUGIN.getCache().getMultiplier(id);
+        if (optionalMultiplier.isPresent()) {
+            return optionalMultiplier.get();
+        }
+        Multiplier multiplier = PLUGIN.getStorageProvider().getMultiplier(id);
+        if (multiplier != null) {
+            PLUGIN.getCache().addMultiplier(multiplier);
+        }
+        return multiplier;
     }
 
     public static Multiplier createMultiplier(UUID uuid, int amount, int minutes, String server, MultiplierType type) {
@@ -413,6 +367,100 @@ public final class CoinsAPI {
         Multiplier multiplier = MultiplierBuilder.newBuilder(server, new MultiplierData(amount, minutes, type)).build(false);
         PLUGIN.getStorageProvider().saveMultiplier(multiplier);
         return multiplier;
+    }
+
+    /**
+     * Get all multipliers from the database.
+     *
+     * @return Collection containing all multipliers from the database.
+     */
+    public static Collection<Multiplier> getMultipliers() {
+        return PLUGIN.getStorageProvider().getMultipliers();
+    }
+
+    /**
+     * Get all multipliers attached to a server from the database.
+     *
+     * @param server Server name to search in the database to get multipliers.
+     * @return Collection containing all multipliers for the specified server from the database.
+     */
+    public static Collection<Multiplier> getMultipliers(@Nonnull String server) {
+        return PLUGIN.getStorageProvider().getMultipliers(server);
+    }
+
+    /**
+     * Get all enabled or disabled multipliers attached to a server from the database.
+     *
+     * @param server  Server name to search in the database to get multipliers.
+     * @param enabled If the storage provider should lookup for enabled or disabled multipliers.
+     * @return Collection containing all multipliers for the specified server from the database.
+     */
+    public static Collection<Multiplier> getMultipliers(@Nonnull String server, boolean enabled) {
+        return PLUGIN.getStorageProvider().getMultipliers(server, enabled);
+    }
+
+    /**
+     * Get all multipliers owned by the specified player.
+     *
+     * @param uuid player to get multipliers from the storageProvider.
+     * @return multipliers of the player in this server.
+     */
+    public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid) {
+        return getMultipliersFor(uuid, false);
+    }
+
+    /**
+     * Get all owned multipliers for a player from the database.
+     *
+     * @param uuid              player to get multipliers from the storageProvider.
+     * @param onlyCurrentServer if the method should only return multipliers available in the current server.
+     * @return multipliers of the player in this server.
+     */
+    public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid, boolean onlyCurrentServer) {
+        if (onlyCurrentServer) {
+            return PLUGIN.getStorageProvider().getMultipliersFor(uuid, PLUGIN.getConfig().getServerName());
+        } else {
+            return PLUGIN.getStorageProvider().getMultipliersFor(uuid);
+        }
+    }
+
+    /**
+     * Get all enabled or disabled multipliers owned by a player from the database.
+     *
+     * @param uuid              player to get multipliers from the storage provider.
+     * @param onlyCurrentServer if the method should only return multipliers available in the current server.
+     * @param enabled           if the storage provider should lookup for enabled or disabled multipliers.
+     * @return multipliers of the player in this server.
+     */
+    public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid, boolean onlyCurrentServer, boolean enabled) {
+        if (onlyCurrentServer) {
+            return PLUGIN.getStorageProvider().getMultipliersFor(uuid, PLUGIN.getConfig().getServerName(), enabled);
+        } else {
+            return PLUGIN.getStorageProvider().getMultipliersFor(uuid, enabled);
+        }
+    }
+
+    /**
+     * Get all multipliers owned by a player in a specific server.
+     *
+     * @param uuid   player to get multipliers from the database.
+     * @param server where we should get the multipliers.
+     * @return multipliers of the player in that server.
+     */
+    public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid, @Nonnull String server) {
+        return PLUGIN.getStorageProvider().getMultipliersFor(uuid, server);
+    }
+
+    /**
+     * Get all enabled or disabled multipliers owned by a player in a server.
+     *
+     * @param uuid    player to get multipliers from the database.
+     * @param server  where we should get the multipliers.
+     * @param enabled if the storage provider should lookup for enabled or disabled multipliers.
+     * @return multipliers of the player in that server.
+     */
+    public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid, @Nonnull String server, boolean enabled) {
+        return PLUGIN.getStorageProvider().getMultipliersFor(uuid, server, enabled);
     }
 
     public static CoinsPlugin getPlugin() {

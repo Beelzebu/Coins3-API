@@ -82,7 +82,7 @@ public final class MultiplierBuilder {
         return this;
     }
 
-    public Multiplier build(boolean callenable) {
+    public Multiplier build(boolean callEnable) {
         Multiplier multiplier = new Multiplier(server, data);
         if (server == null && data.getType() == MultiplierType.SERVER) {
             CoinsAPI.getPlugin().log("Multiplier %s, was created with SERVER type but doesn't have a valid server, forcing type to GLOBAL", id);
@@ -91,7 +91,7 @@ public final class MultiplierBuilder {
         multiplier.setId(id);
         multiplier.setQueue(queue);
         multiplier.setEndTime(endTime);
-        if (enabled && callenable) {
+        if (enabled && callEnable) {
             multiplier.enable(queue);
         }
         return multiplier;

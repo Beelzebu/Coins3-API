@@ -21,9 +21,9 @@ package com.github.beelzebu.coins.api.storage;
 import com.github.beelzebu.coins.api.CoinsResponse;
 import com.github.beelzebu.coins.api.CoinsUser;
 import com.github.beelzebu.coins.api.Multiplier;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
@@ -58,11 +58,19 @@ public interface StorageProvider {
 
     Multiplier getMultiplier(int id);
 
-    Set<Multiplier> getMultipliers(UUID uuid);
+    Collection<Multiplier> getMultipliers();
 
-    Set<Multiplier> getMultipliers(UUID uuid, String server);
+    Collection<Multiplier> getMultipliers(String server);
 
-    Set<Multiplier> getMultipliers();
+    Collection<Multiplier> getMultipliers(String server, boolean enabled);
+
+    Collection<Multiplier> getMultipliersFor(UUID uuid);
+
+    Collection<Multiplier> getMultipliersFor(UUID uuid, boolean enabled);
+
+    Collection<Multiplier> getMultipliersFor(UUID uuid, String server);
+
+    Collection<Multiplier> getMultipliersFor(UUID uuid, String server, boolean enabled);
 
     void enableMultiplier(Multiplier multiplier);
 
