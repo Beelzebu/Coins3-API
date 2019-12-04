@@ -31,7 +31,6 @@ public final class MultiplierBuilder {
 
     private final String server;
     private final MultiplierData data;
-    private long endTime = 0L;
     private int id = -1;
     private boolean enabled = false;
     private boolean queue = false;
@@ -54,11 +53,6 @@ public final class MultiplierBuilder {
 
     public MultiplierBuilder setID(int id) {
         this.id = id;
-        return this;
-    }
-
-    public MultiplierBuilder setEndTime(long endTime) {
-        this.endTime = endTime;
         return this;
     }
 
@@ -89,10 +83,9 @@ public final class MultiplierBuilder {
             multiplier.getData().setType(MultiplierType.GLOBAL);
         }
         multiplier.setId(id);
-        multiplier.setQueue(queue);
-        multiplier.setEndTime(endTime);
+        multiplier.setQueue(queue || enabled);
         if (enabled && callEnable) {
-            multiplier.enable(queue);
+            multiplier.enable();
         }
         return multiplier;
     }

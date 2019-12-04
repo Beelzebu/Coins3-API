@@ -18,35 +18,28 @@
  */
 package com.github.beelzebu.coins.api.messaging;
 
-/**
- * All message types that we send, used to identify messages when we need to
- * handle them.
- *
- * @author Beelzebu
- */
-enum MessageType {
-    /**
-     * Send user coins update
-     */
-    USER_UPDATE,
-    /**
-     * Request other servers to send executors
-     */
-    EXECUTOR_REQUEST,
-    /**
-     * Send executors to other servers
-     */
-    EXECUTOR_SEND,
-    /**
-     * Request multipliers from other servers
-     */
-    MULTIPLIER_REQUEST,
-    /**
-     * Send an updated multiplier to other servers
-     */
-    MULTIPLIER_UPDATE,
-    /**
-     * Disable a multiplier and
-     */
-    MULTIPLIER_DISABLE
+import com.github.beelzebu.coins.api.CoinsAPI;
+import com.google.gson.JsonObject;
+
+public class Message {
+
+    private final MessageType type;
+    private final JsonObject data;
+
+    public Message(MessageType type, JsonObject data) {
+        this.type = type;
+        this.data = data;
+    }
+
+    public MessageType getType() {
+        return type;
+    }
+
+    public JsonObject getData() {
+        return data;
+    }
+
+    public JsonObject toJson() {
+        return CoinsAPI.getPlugin().getGson().toJsonTree(this).getAsJsonObject();
+    }
 }

@@ -45,6 +45,10 @@ public abstract class CoinsConfig extends AbstractConfigFile {
         return CoinsAPI.getPlugin().getMessagingService().getType().equals(MessagingServiceType.BUNGEECORD);
     }
 
+    public boolean isRedisLoadMultipliers() {
+        return getBoolean("Redis.Load Multipliers", true);
+    }
+
     public List<String> getCommandAliases() {
         return getStringList("General.Command.Aliases", Collections.emptyList());
     }

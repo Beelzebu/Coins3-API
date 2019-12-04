@@ -38,6 +38,9 @@ public final class MultiplierData {
         Objects.requireNonNull(name, "Name can't be null");
         Objects.requireNonNull(uniqueId, "UUID can't be null");
         Objects.requireNonNull(type, "MultiplierType can't be null");
+        if (type == MultiplierType.PERSONAL && (SERVER_UUID == uniqueId || Objects.equals(SERVER_NAME, name))) {
+            throw new IllegalStateException("Can't create personal multiplier for server enabler");
+        }
         enablerUUID = uniqueId;
         enablerName = name;
         this.amount = amount;
@@ -101,7 +104,7 @@ public final class MultiplierData {
      *
      * @return <i>true</i> if the uuid and name are equals to server name and uuid, <i>false</i> otherwise.
      */
-    public boolean isServer() {
+    public boolean isServerEnabler() {
         return Objects.equals(enablerName, SERVER_NAME) && enablerUUID == SERVER_UUID;
     }
 }

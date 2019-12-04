@@ -27,12 +27,15 @@ import java.text.DecimalFormat;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 
 /**
  * @author Beelzebu
  */
+@SuppressWarnings({"WeakerAccess", "unused"})
 public final class CoinsAPI {
 
     private static final DecimalFormat DF = new DecimalFormat("#.#");
@@ -54,7 +57,7 @@ public final class CoinsAPI {
         if (uuid == null) {
             return -1;
         }
-        return PLUGIN.getCache().getCoins(uuid).orElseGet(() -> PLUGIN.getStorageProvider().getCoins(uuid));
+        return getCoins(uuid);
     }
 
     /**
@@ -64,7 +67,15 @@ public final class CoinsAPI {
      * @return coins of the player
      */
     public static double getCoins(@Nonnull UUID uuid) {
-        return PLUGIN.getCache().getCoins(uuid).orElseGet(() -> PLUGIN.getStorageProvider().getCoins(uuid));
+        OptionalDouble optionalCoins = PLUGIN.getCache().getCoins(uuid);
+        if (!optionalCoins.isPresent()) { // send coins to other servers and cache
+            PLUGIN.getMessagingService().publishUser(uuid, optionalCoins.orElseGet(() -> PLUGIN.getStorageProvider().getCoins(uuid)));
+        }
+        // try again to get coins from cache, otherwise fallback to database
+        return PLUGIN.getCache().getCoins(uuid).orElseGet(() -> {
+            PLUGIN.debug("Getting coins from storage for: '" + uuid + "', because player isn't in cache.");
+            return PLUGIN.getStorageProvider().getCoins(uuid);
+        });
     }
 
     /**
@@ -74,7 +85,7 @@ public final class CoinsAPI {
      * @return Coins in decimal format "#.#"
      */
     public static String getCoinsString(@Nonnull String name) {
-        double coins = getCoins(name.toLowerCase());
+        double coins = getCoins(name);
         if (coins >= 0) {
             return DF.format(coins);
         } else {
@@ -100,11 +111,11 @@ public final class CoinsAPI {
     /**
      * Add coins to a player by his name, selecting if the multipliers should be used to calculate the coins. When this
      * method is called the following things will happen:
-     * <ul>
+     * <ol>
      *     <li>the plugin implementation will get the UUID associated with the name, first it will try to get it from
      *     online players if the implementation allows it, then from the database if the UUID obtained is null.</li>
      *     <li>{@link #addCoins(UUID, double, boolean)} method will be called with the UUID that we obtained.</li>
-     * </ul>
+     * </ol>
      *
      * @param name     Player name to add the coins.
      * @param coins    Coins to add.
@@ -128,13 +139,8 @@ public final class CoinsAPI {
             return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Errors.Unknown player", "%target%", uuid.toString());
         }
         double finalCoins = coins;
-        if (multiply && !getMultipliers().isEmpty()) {
-            int multiplyTotal = getMultipliers().stream().filter(Multiplier::isEnabled).mapToInt(multiplier -> {
-                if (multiplier.getData().getType().equals(MultiplierType.PERSONAL) && !Objects.equals(uuid, multiplier.getData().getEnablerUUID())) {
-                    return 0;
-                }
-                return multiplier.getData().getAmount();
-            }).sum();
+        if (multiply && !getUsableMultipliers(uuid).isEmpty()) {
+            int multiplyTotal = getUsableMultipliers(uuid).stream().mapToInt(multiplier -> multiplier.getData().getAmount()).sum();
             finalCoins *= Math.max(multiplyTotal, 1);
             for (String perm : PLUGIN.getBootstrap().getPermissions(uuid)) {
                 if (perm.startsWith("coins.multiplier.x")) {
@@ -221,7 +227,6 @@ public final class CoinsAPI {
                 }
                 return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Errors.Max value exceeded");
             }
-            PLUGIN.getBootstrap().callCoinsChangeEvent(uuid, getCoins(uuid), coins);
             PLUGIN.getMessagingService().publishUser(uuid, coins);
             return PLUGIN.getStorageProvider().setCoins(uuid, coins);
         } else {
@@ -238,12 +243,17 @@ public final class CoinsAPI {
      * @return {@link CoinsResponse}
      */
     public static CoinsResponse payCoins(@Nonnull String from, @Nonnull String to, double amount) {
-        if (getCoins(from) >= amount) {
-            takeCoins(from, amount);
-            addCoins(to, amount, false);
-            return CoinsResponse.SUCCESS;
+        Objects.requireNonNull(from, "from name can't be null");
+        Objects.requireNonNull(to, "to name can't be null");
+        UUID fromUUID = UUIDUtil.getUniqueId(from);
+        if (fromUUID == null) {
+            return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Errors.Unknown player", "%target%", from);
         }
-        return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Errors.No Coins");
+        UUID toUUID = UUIDUtil.getUniqueId(to);
+        if (toUUID == null) {
+            return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Errors.Unknown player", "%target%", to);
+        }
+        return payCoins(fromUUID, toUUID, amount);
     }
 
     /**
@@ -256,8 +266,19 @@ public final class CoinsAPI {
      */
     public static CoinsResponse payCoins(@Nonnull UUID from, @Nonnull UUID to, double amount) {
         if (getCoins(from) >= amount) {
-            if (takeCoins(from, amount).isSuccess() && addCoins(to, amount, false).isSuccess()) {
-                return CoinsResponse.SUCCESS;
+            CoinsResponse takeResponse = takeCoins(from, amount);
+            if (takeResponse.isSuccess()) {
+                CoinsResponse addResponse = addCoins(to, amount, false);
+                if (addResponse.isSuccess()) {
+                    return addResponse;
+                } else {
+                    PLUGIN.debug("Pay failed in transaction: \n" +
+                            "from: '" + from + "' to: '" + to + "' ammount: " + amount + " response: '" + addResponse.getResponse() + ":" + addResponse.getMessage(""));
+                    addResponse = addCoins(from, amount, false);
+                    PLUGIN.debug("Adding coins back to: '" + from + "' response: " + addResponse.getResponse() + ":" + addResponse.getMessage(""));
+                }
+            } else {
+                return takeResponse;
             }
         }
         return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Errors.No Coins");
@@ -312,7 +333,7 @@ public final class CoinsAPI {
         if (CACHED_TOP.getValue() != null && CACHED_TOP.getValue() >= System.currentTimeMillis() && CACHED_TOP.getKey().size() <= top) {
             return CACHED_TOP.getKey().getFirst(top).toArray(new CoinsUser[top]);
         } else {
-            CACHED_TOP.setKey(new CoinsSet<>(PLUGIN.getStorageProvider().getTopPlayers(top)));
+            CACHED_TOP.setKey(new CoinsSet<>(PLUGIN.getStorageProvider().getTopPlayers(top).stream().filter(Objects::nonNull).collect(Collectors.toSet())));
             CACHED_TOP.setValue(System.currentTimeMillis() + TOP_CACHE_MILLIS);
             return CACHED_TOP.getKey().toArray(new CoinsUser[top]);
         }
@@ -357,25 +378,21 @@ public final class CoinsAPI {
         return multiplier;
     }
 
+    @SuppressWarnings("deprecation")
     public static Multiplier createMultiplier(UUID uuid, int amount, int minutes, String server, MultiplierType type) {
-        Multiplier multiplier = MultiplierBuilder.newBuilder(server, new MultiplierData(uuid, PLUGIN.getName(uuid, false), amount, minutes, type)).build(false);
+        MultiplierData multiplierData;
+        if (uuid != null) {
+            multiplierData = new MultiplierData(uuid, PLUGIN.getName(uuid, false), amount, minutes, type);
+        } else {
+            multiplierData = new MultiplierData(amount, minutes, type);
+        }
+        Multiplier multiplier = MultiplierBuilder.newBuilder(server, multiplierData).build(false);
         PLUGIN.getStorageProvider().saveMultiplier(multiplier);
         return multiplier;
     }
 
     public static Multiplier createMultiplier(int amount, int minutes, String server, MultiplierType type) {
-        Multiplier multiplier = MultiplierBuilder.newBuilder(server, new MultiplierData(amount, minutes, type)).build(false);
-        PLUGIN.getStorageProvider().saveMultiplier(multiplier);
-        return multiplier;
-    }
-
-    /**
-     * Get all multipliers from the database.
-     *
-     * @return Collection containing all multipliers from the database.
-     */
-    public static Collection<Multiplier> getMultipliers() {
-        return PLUGIN.getStorageProvider().getMultipliers();
+        return createMultiplier(null, amount, minutes, server, type);
     }
 
     /**
@@ -397,6 +414,10 @@ public final class CoinsAPI {
      */
     public static Collection<Multiplier> getMultipliers(@Nonnull String server, boolean enabled) {
         return PLUGIN.getStorageProvider().getMultipliers(server, enabled);
+    }
+
+    public static Collection<Multiplier> getUsableMultipliers(@Nonnull UUID uuid) {
+        return PLUGIN.getCache().getUsableMultipliers(uuid);
     }
 
     /**

@@ -27,7 +27,6 @@ import com.github.beelzebu.coins.api.messaging.MessagingServiceType;
 import com.github.beelzebu.coins.api.storage.StorageProvider;
 import com.github.beelzebu.coins.api.storage.StorageType;
 import com.google.gson.Gson;
-import java.io.File;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.UUID;
@@ -68,8 +67,6 @@ public interface CoinsPlugin {
     Gson getGson();
 
     void loadExecutors();
-
-    File getMultipliersFile();
 
     void log(String message, Object... replace);
 

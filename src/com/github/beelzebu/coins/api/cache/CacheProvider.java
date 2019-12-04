@@ -19,9 +19,15 @@
 package com.github.beelzebu.coins.api.cache;
 
 import com.github.beelzebu.coins.api.Multiplier;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 
 /**
@@ -29,42 +35,53 @@ import javax.annotation.Nonnull;
  */
 public interface CacheProvider {
 
+    void start();
+
+    void stop();
+
     /**
      * Get the coins of this player from the cache.
      *
      * @param uuid player to lookup in the cache.
      * @return optional which may or may not contain the coins.
      */
-    Optional<Double> getCoins(@Nonnull UUID uuid);
+    OptionalDouble getCoins(@Nonnull UUID uuid);
 
-    void updatePlayer(UUID uuid, double coins);
+    void updatePlayer(@Nonnull UUID uuid, double coins);
 
-    void removePlayer(UUID uuid);
+    void removePlayer(@Nonnull UUID uuid);
 
     /**
      * Get a multiplier from the cache,
      */
     Optional<Multiplier> getMultiplier(int id);
 
-    Set<Multiplier> getMultipliers(String server);
+    default Collection<Multiplier> getUsableMultipliers(UUID uniqueId) {
+        return getMultipliers().stream().filter(multiplier -> multiplier.canUsePlayer(uniqueId)).collect(Collectors.toSet());
+    }
 
-    void addMultiplier(Multiplier multiplier);
+    default Collection<Multiplier> getMultipliers(@Nonnull String server) {
+        Collection<Multiplier> multipliers = getMultipliers();
+        Stream<Multiplier> multiplierStream = multipliers.stream().filter(multiplier -> multiplier.getServer().equals(server));
+        if (multiplierStream.anyMatch(Multiplier::isEnabled)) {
+            return multiplierStream.filter(Multiplier::isEnabled).collect(Collectors.toSet());
+        }
+        Optional<Multiplier> optionalMultiplier = multiplierStream.filter(Multiplier::isQueue).min(Comparator.comparingLong(Multiplier::getQueueStart)); // get first queued multiplier
+        if (optionalMultiplier.isPresent()) {
+            Multiplier multiplier = optionalMultiplier.get();
+            multiplier.enable();
+            return Collections.singleton(multiplier);
+        }
+        return Collections.emptySet();
+    }
 
-    /**
-     * Remove a multiplier from the cache and enabled multipliers storage (multipliers.json file in plugin's data
-     * folder)
-     *
-     * @param multiplier what multiplier we should delete.
-     */
-    void deleteMultiplier(Multiplier multiplier);
+    void addMultiplier(@Nonnull Multiplier multiplier);
 
-    void updateMultiplier(Multiplier multiplier, boolean callenable);
+    void deleteMultiplier(int id);
 
-    void addQueueMultiplier(Multiplier multiplier);
+    void updateMultiplier(@Nonnull Multiplier multiplier, boolean callenable);
 
-    void removeQueueMultiplier(Multiplier multiplier);
-
-    Set<Multiplier> getMultipliers();
+    Collection<Multiplier> getMultipliers();
 
     Set<UUID> getPlayers();
 

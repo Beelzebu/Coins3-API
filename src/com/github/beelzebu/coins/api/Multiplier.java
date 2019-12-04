@@ -22,6 +22,8 @@ import com.github.beelzebu.coins.api.utils.StringUtils;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Handle Coins multipliers.
@@ -32,11 +34,10 @@ public final class Multiplier {
 
     private int id;
     private String server;
-    private MultiplierData data;
+    private final MultiplierData data;
     private boolean enabled = false;
-    private boolean queue = false;
-    private boolean custom = false;
-    private long endTime = 0;
+    private long start = 0;
+    private long queueStart = 0;
 
     public Multiplier(String server, MultiplierData data) {
         this.data = data;
@@ -59,40 +60,30 @@ public final class Multiplier {
         return data;
     }
 
-    public void setData(MultiplierData data) {
-        this.data = data;
-    }
-
     public boolean isEnabled() {
+        getAndCheckRemainingMillis();
         return enabled;
     }
 
-    void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
     public boolean isQueue() {
-        return queue;
+        return !enabled;
     }
 
     void setQueue(boolean queue) {
-        this.queue = queue;
+        if (queue) {
+            queueStart = System.currentTimeMillis();
+        } else {
+            queueStart = 0;
+        }
+        enabled = !queue;
     }
 
-    public boolean isCustom() {
-        return custom;
+    public long getStart() {
+        return start;
     }
 
-    void setCustom(boolean custom) {
-        this.custom = custom;
-    }
-
-    public long getEndTime() {
-        return endTime;
-    }
-
-    void setEndTime(long endTime) {
-        this.endTime = endTime;
+    public long getQueueStart() {
+        return queueStart;
     }
 
     public static Multiplier fromJson(String multiplier) {
@@ -106,49 +97,51 @@ public final class Multiplier {
         return null;
     }
 
-    /**
-     * Enable this multiplier with the data from {@link #getData()}
-     *
-     * @param queue if the multiplier should be queued or immediately enabled.
-     */
-    public void enable(boolean queue) {
-        if (System.currentTimeMillis() + data.getMinutes() * 60000 > endTime && endTime > 1) {
-            return;
-        }
-        enabled = true;
-        endTime = System.currentTimeMillis() + data.getMinutes() * 60000;
-        if (queue && (CoinsAPI.getMultipliers(server).isEmpty() || CoinsAPI.getMultipliers().stream().noneMatch(Multiplier::isEnabled)) || !data.getType().equals(MultiplierType.SERVER)) {
-            queue = false;
-        }
-        this.queue = queue;
-        if (!queue) {
+    @SuppressWarnings("UnusedReturnValue")
+    public boolean enable() {
+        synchronized (this) {
+            if (isEnabled()) {
+                return true;
+            }
+            if (!data.getType().equals(MultiplierType.PERSONAL) && !CoinsAPI.getMultipliers(CoinsAPI.getPlugin().getConfig().getServerName()).isEmpty()) {
+                setQueue(true);
+            } else {
+                setQueue(false);
+            }
             CoinsAPI.getPlugin().getCache().addMultiplier(this);
-            CoinsAPI.getPlugin().getStorageProvider().enableMultiplier(this);
-            CoinsAPI.getPlugin().getMessagingService().enableMultiplier(this);
-            CoinsAPI.getPlugin().getBootstrap().callMultiplierEnableEvent(this);
-        } else {
-            CoinsAPI.getPlugin().getCache().addQueueMultiplier(this);
+            if (isEnabled()) {
+                start = System.currentTimeMillis();
+                enabled = true;
+                CoinsAPI.getPlugin().getStorageProvider().enableMultiplier(this);
+                CoinsAPI.getPlugin().getMessagingService().enableMultiplier(this);
+            }
         }
+        return isEnabled();
     }
 
     /**
      * Disable and then delete this multiplier from the storageProvider.
      */
     public void disable() {
-        try {
-            CoinsAPI.getPlugin().getCache().removeQueueMultiplier(this);
-            CoinsAPI.getPlugin().getCache().deleteMultiplier(this);
-            CoinsAPI.getPlugin().getStorageProvider().deleteMultiplier(this);
-            CoinsAPI.getPlugin().getMessagingService().disableMultiplier(this);
-        } catch (Exception ex) {
-            CoinsAPI.getPlugin().log("An unexpected exception has occurred while disabling a multiplier with the id: " + id);
-            CoinsAPI.getPlugin().log("Check plugin log files for more information, please report this bug on https://github.com/Beelzebu/Coins/issues");
-            CoinsAPI.getPlugin().debug(ex);
+        synchronized (this) {
+            if (!enabled) {
+                return;
+            }
+            enabled = false;
+            try {
+                CoinsAPI.getPlugin().getCache().deleteMultiplier(getId());
+                CoinsAPI.getPlugin().getStorageProvider().deleteMultiplier(this);
+                CoinsAPI.getPlugin().getMessagingService().disableMultiplier(this);
+            } catch (Exception ex) {
+                CoinsAPI.getPlugin().log("An unexpected exception has occurred while disabling a multiplier with the id: " + id);
+                CoinsAPI.getPlugin().log("Check plugin log files for more information, please report this bug on https://github.com/Beelzebu/Coins/issues");
+                CoinsAPI.getPlugin().debug(ex);
+            }
         }
     }
 
-    public String getMultiplierTimeFormatted() {
-        return StringUtils.formatTime(checkMultiplierTime());
+    public String getEndTimeFormatted() {
+        return StringUtils.formatTime(getAndCheckRemainingMillis());
     }
 
     /**
@@ -165,10 +158,48 @@ public final class Multiplier {
         return CoinsAPI.getPlugin().getGson().toJsonTree(this).getAsJsonObject();
     }
 
-    private long checkMultiplierTime() {
-        if (endTime - System.currentTimeMillis() <= 0) {
+    private long getAndCheckRemainingMillis() {
+        if (!isEnabled()) {
+            return 0;
+        }
+        if (System.currentTimeMillis() >= start + TimeUnit.MINUTES.toMillis(data.getMinutes())) {
             disable();
         }
-        return endTime - System.currentTimeMillis() >= 0 ? endTime - System.currentTimeMillis() : 0;
+        return System.currentTimeMillis() - start + TimeUnit.MINUTES.toMillis(data.getMinutes()) > 0 ? System.currentTimeMillis() - start + TimeUnit.MINUTES.toMillis(data.getMinutes()) : 0;
+    }
+
+    public long getEndTime() {
+        getAndCheckRemainingMillis();
+        return start + TimeUnit.MINUTES.toMillis(data.getMinutes());
+    }
+
+    public boolean canUsePlayer(UUID uniqueId) {
+        if (!isEnabled()) {
+            return false;
+        }
+        MultiplierData multiplierData = getData();
+        return !multiplierData.getType().equals(MultiplierType.PERSONAL) || multiplierData.getEnablerUUID().equals(uniqueId);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        Multiplier that = (Multiplier) o;
+        return getId() == that.getId() &&
+                isEnabled() == that.isEnabled() &&
+                getStart() == that.getStart() &&
+                getQueueStart() == that.getQueueStart() &&
+                getServer().equals(that.getServer()) &&
+                getData().equals(that.getData());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getId(), getServer(), getData(), isEnabled(), getStart(), getQueueStart());
     }
 }
