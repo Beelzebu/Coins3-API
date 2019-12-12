@@ -54,7 +54,7 @@ public abstract class SQLDatabase implements StorageProvider {
 
     public SQLDatabase(CoinsPlugin plugin) {
         this.plugin = plugin;
-        prefix = plugin.getStorageProvider().getStorageType().equals(StorageType.SQLITE) ? "" : plugin.getConfig().getString("MySQL.Prefix");
+        prefix = getStorageType().equals(StorageType.SQLITE) ? "" : plugin.getConfig().getString("MySQL.Prefix");
         DATA_TABLE = prefix + plugin.getConfig().getString("MySQL.Data Table", "data");
         MULTIPLIERS_TABLE = prefix + plugin.getConfig().getString("MySQL.Multipliers Table", "multipliers");
     }
