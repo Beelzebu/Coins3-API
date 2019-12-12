@@ -157,7 +157,7 @@ public abstract class AbstractMessagingService {
             }
             break;
             case EXECUTOR_SEND: { // other server sent an executor
-                ExecutorManager.addExecutor(Executor.fromJson(message.getData().getAsJsonObject("executor").toString()));
+                ExecutorManager.addExecutor(Executor.fromJson(message.getData().get("executor").getAsString()));
             }
             break;
             case MULTIPLIER_REQUEST: { // other server is requesting multipliers from this server
