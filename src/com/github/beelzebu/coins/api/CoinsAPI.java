@@ -378,7 +378,6 @@ public final class CoinsAPI {
         return multiplier;
     }
 
-    @SuppressWarnings("deprecation")
     public static Multiplier createMultiplier(UUID uuid, int amount, int minutes, String server, MultiplierType type) {
         MultiplierData multiplierData;
         if (uuid != null) {
@@ -386,9 +385,8 @@ public final class CoinsAPI {
         } else {
             multiplierData = new MultiplierData(amount, minutes, type);
         }
-        Multiplier multiplier = MultiplierBuilder.newBuilder(server, multiplierData).build(false);
-        PLUGIN.getStorageProvider().saveMultiplier(multiplier);
-        return multiplier;
+        Multiplier multiplier = Multiplier.builder().setServer(server).setData(multiplierData).build(false);
+        return PLUGIN.getStorageProvider().saveMultiplier(multiplier);
     }
 
     public static Multiplier createMultiplier(int amount, int minutes, String server, MultiplierType type) {

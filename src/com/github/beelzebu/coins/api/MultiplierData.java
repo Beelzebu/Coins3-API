@@ -95,6 +95,7 @@ public final class MultiplierData {
     }
 
     public void setType(MultiplierType type) {
+        Objects.requireNonNull(type, "MultiplierType can't be null");
         this.type = type;
     }
 
@@ -106,5 +107,37 @@ public final class MultiplierData {
      */
     public boolean isServerEnabler() {
         return Objects.equals(enablerName, SERVER_NAME) && enablerUUID == SERVER_UUID;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MultiplierData that = (MultiplierData) o;
+        return getAmount() == that.getAmount() &&
+                getMinutes() == that.getMinutes() &&
+                getEnablerUUID().equals(that.getEnablerUUID()) &&
+                getEnablerName().equals(that.getEnablerName()) &&
+                getType() == that.getType();
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getEnablerUUID(), getEnablerName(), getAmount(), getMinutes(), getType());
+    }
+
+    @Override
+    public String toString() {
+        return "MultiplierData{" +
+                "enablerUUID=" + enablerUUID +
+                ", enablerName='" + enablerName + '\'' +
+                ", amount=" + amount +
+                ", minutes=" + minutes +
+                ", type=" + type +
+                '}';
     }
 }

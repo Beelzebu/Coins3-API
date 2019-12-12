@@ -44,6 +44,10 @@ public interface CoinsBootstrap {
 
     void runSync(Runnable rn);
 
+    void schedule(Runnable rn, long interval);
+
+    void scheduleAsync(Runnable rn, long interval);
+
     void executeCommand(String cmd);
 
     void log(String msg);

@@ -48,7 +48,7 @@ public final class Multiplier {
         return id;
     }
 
-    void setId(int id) {
+    private void setId(int id) {
         this.id = id;
     }
 
@@ -100,6 +100,9 @@ public final class Multiplier {
     @SuppressWarnings("UnusedReturnValue")
     public boolean enable() {
         synchronized (this) {
+            if (getId() < 0) {
+                throw new IllegalStateException("Multiplier has an invalid ID");
+            }
             if (isEnabled()) {
                 return true;
             }
@@ -177,8 +180,15 @@ public final class Multiplier {
         if (!isEnabled()) {
             return false;
         }
+        if (!Objects.equals(CoinsAPI.getPlugin().getConfig().getServerName(), getServer())) {
+            return false;
+        }
         MultiplierData multiplierData = getData();
         return !multiplierData.getType().equals(MultiplierType.PERSONAL) || multiplierData.getEnablerUUID().equals(uniqueId);
+    }
+
+    public Builder toBuilder() {
+        return builder().setId(id).setServer(server).setData(data).setEnabled(enabled);
     }
 
     @Override
@@ -201,5 +211,68 @@ public final class Multiplier {
     @Override
     public int hashCode() {
         return Objects.hash(getId(), getServer(), getData(), isEnabled(), getStart(), getQueueStart());
+    }
+
+    @Override
+    public String toString() {
+        return "Multiplier{" +
+                "id=" + id +
+                ", server='" + server + '\'' +
+                ", data=" + data +
+                ", enabled=" + enabled +
+                ", start=" + start +
+                ", queueStart=" + queueStart +
+                '}';
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static final class Builder {
+
+        private int id = -1;
+        private String server;
+        private MultiplierData data;
+        private boolean enabled;
+
+        public Builder() {
+        }
+
+        public Builder setId(int id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder setServer(String server) {
+            this.server = server;
+            return this;
+        }
+
+        public Builder setData(MultiplierData data) {
+            this.data = data;
+            return this;
+        }
+
+        public Builder setEnabled(boolean enabled) {
+            this.enabled = enabled;
+            return this;
+        }
+
+        public Multiplier build(boolean callEnable) {
+            Multiplier multiplier = new Multiplier(server, data);
+            multiplier.setId(id);
+            if (server == null && data.getType() == MultiplierType.SERVER) {
+                CoinsAPI.getPlugin().log("Multiplier %s, was created with SERVER type but doesn't have a valid server, forcing type to GLOBAL", id);
+                multiplier.getData().setType(MultiplierType.GLOBAL);
+            }
+            if (callEnable) {
+                if (!enabled) {
+                    throw new IllegalStateException("Can't call enable for a disabled multiplier.");
+                }
+                multiplier.enable();
+            }
+            return multiplier;
+        }
     }
 }

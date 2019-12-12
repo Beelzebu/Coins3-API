@@ -22,7 +22,6 @@ import com.github.beelzebu.coins.api.CoinsAPI;
 import com.github.beelzebu.coins.api.CoinsResponse;
 import com.github.beelzebu.coins.api.CoinsUser;
 import com.github.beelzebu.coins.api.Multiplier;
-import com.github.beelzebu.coins.api.MultiplierBuilder;
 import com.github.beelzebu.coins.api.MultiplierData;
 import com.github.beelzebu.coins.api.MultiplierType;
 import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
@@ -218,26 +217,39 @@ public abstract class SQLDatabase implements StorageProvider {
     }
 
     @Override
-    public void saveMultiplier(Multiplier multiplier) {
-        // UUID uuid, int amount, int minutes, String server, MultiplierType type
-        try (Connection c = getConnection()) {
-            DatabaseUtils.prepareStatement(Statement.RETURN_GENERATED_KEYS, c, SQLQuery.CREATE_MULTIPLIER, multiplier.getServer(), multiplier.getData().getEnablerUUID(), multiplier.getData().getType(), multiplier.getData().getAmount(), multiplier.getData().getMinutes(), multiplier.isEnabled(), multiplier.isQueue());
-            MultiplierBuilder.setId(multiplier, c.createStatement().executeQuery("LAST_INSERT_ID()").getInt(1));
+    public Multiplier saveMultiplier(Multiplier multiplier) {
+        // (id) server type amount minutes start enabled queue data_id(uuid)
+        try (Connection c = getConnection();
+             PreparedStatement ps = DatabaseUtils.prepareStatement(Statement.RETURN_GENERATED_KEYS, c, SQLQuery.CREATE_MULTIPLIER,
+                     multiplier.getServer(),
+                     multiplier.getData().getEnablerUUID(),
+                     multiplier.getData().getType(),
+                     multiplier.getData().getAmount(),
+                     multiplier.getData().getMinutes(),
+                     multiplier.isEnabled(),
+                     multiplier.isQueue());
+             ResultSet res = ps.getGeneratedKeys()) {
+            if (res.next()) {
+                return multiplier.toBuilder().setId(res.getInt(1)).build(false);
+            } else {
+                plugin.log("Can't set id for multiplier: " + multiplier.toString());
+            }
         } catch (SQLException ex) {
             plugin.log("Something was wrong when creating a multiplier for " + plugin.getName(multiplier.getData().getEnablerUUID(), false));
             plugin.debug(multiplier.toJson().toString());
             plugin.debug(ex);
         }
+        return multiplier;
     }
 
     @Override
     public Multiplier getMultiplier(int id) {
         try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_MULTIPLIER_ID, id); ResultSet res = ps.executeQuery()) {
             if (res.next()) {
-                return MultiplierBuilder.newBuilder(res.getString("server"), getDataFromResultSet(res))
-                        .setID(res.getInt("id"))
-                        .setEnabled(res.getBoolean("enabled"))
-                        .setQueue(res.getBoolean("queue"))
+                return Multiplier.builder().setServer(res.getString("server"))
+                        .setData(getDataFromResultSet(res))
+                        .setId(res.getInt("id"))
+                        .setEnabled(res.getBoolean("enabled") || res.getBoolean("queue"))
                         .build(false);
             }
         } catch (SQLException ex) {

@@ -102,7 +102,9 @@ public enum SQLQuery {
      *
      * @see MultiplierType
      */
-    CREATE_MULTIPLIER("INSERT INTO `" + SQLDatabase.MULTIPLIERS_TABLE + "` (`id`, `server`, `uuid`, `type`, `amount`, `minutes`, `endtime`, `queue`, `enabled`) VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?);"),
+    CREATE_MULTIPLIER("INSERT INTO `" + SQLDatabase.MULTIPLIERS_TABLE + "`" +
+            "(`id`, `server`, `type`, `amount`, `minutes`, `start`, `enabled`, `queue`, `data_id`) VALUES " +
+            "(null, ?, ?, ?, ?, ?, ?, ?, (SELECT id FROM `" + SQLDatabase.DATA_TABLE + "` WHERE uuid = ?));"),
     /**
      * Select top users from the database.
      * </br>

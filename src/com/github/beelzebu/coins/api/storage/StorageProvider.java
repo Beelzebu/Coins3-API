@@ -54,7 +54,7 @@ public interface StorageProvider {
 
     LinkedHashSet<CoinsUser> getTopPlayers(int top);
 
-    void saveMultiplier(Multiplier multiplier);
+    Multiplier saveMultiplier(Multiplier multiplier);
 
     Multiplier getMultiplier(int id);
 
