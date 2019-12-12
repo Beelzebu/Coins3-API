@@ -31,6 +31,7 @@ import java.util.UUID;
 /**
  * @author Beelzebu
  */
+@SuppressWarnings("unused")
 public abstract class AbstractMessagingService {
 
     /**
@@ -46,7 +47,31 @@ public abstract class AbstractMessagingService {
                 JsonObject user = new JsonObject();
                 user.addProperty("uuid", uuid.toString());
                 user.addProperty("coins", coins);
-                sendMessage(user, MessageType.USER_UPDATE);
+                sendMessage(new Message(MessageType.USER_UPDATE, user));
+            } catch (Exception ex) {
+                CoinsAPI.getPlugin().log("An unexpected error has occurred while updating coins for: " + uuid);
+                CoinsAPI.getPlugin().log("Check plugin log files for more information, please report this bug on https://github.com/Beelzebu/Coins3-API/issues");
+                CoinsAPI.getPlugin().debug(ex);
+            }
+        }
+    }
+
+    /**
+     * Publish user coins update over all servers using this messaging service.
+     *
+     * @param uuid     user to publish.
+     * @param coins    coins to publish.
+     * @param oldCoins old user balance.
+     */
+    public void publishUser(UUID uuid, double coins, double oldCoins) {
+        Objects.requireNonNull(uuid, "UUID can't be null");
+        if (coins > -1) {
+            try {
+                JsonObject user = new JsonObject();
+                user.addProperty("uuid", uuid.toString());
+                user.addProperty("coins", coins);
+                user.addProperty("oldCoins", oldCoins);
+                sendMessage(new Message(MessageType.USER_UPDATE, user));
             } catch (Exception ex) {
                 CoinsAPI.getPlugin().log("An unexpected error has occurred while updating coins for: " + uuid);
                 CoinsAPI.getPlugin().log("Check plugin log files for more information, please report this bug on https://github.com/Beelzebu/Coins3-API/issues");
@@ -63,7 +88,7 @@ public abstract class AbstractMessagingService {
     public final void updateMultiplier(Multiplier multiplier) {
         Objects.requireNonNull(multiplier, "Multiplier can't be null");
         try {
-            sendMessage(objectWith("multiplier", multiplier.toJson()), MessageType.MULTIPLIER_UPDATE);
+            sendMessage(new Message(MessageType.MULTIPLIER_UPDATE, objectWith("multiplier", multiplier.toJson())));
         } catch (Exception ex) {
             CoinsAPI.getPlugin().log("An unexpected error has occurred while publishing a multiplier over messaging service.");
             CoinsAPI.getPlugin().log("Check plugin log files for more information, please report this bug on https://github.com/Beelzebu/Coins3-API/issues");
@@ -79,7 +104,7 @@ public abstract class AbstractMessagingService {
     public final void enableMultiplier(Multiplier multiplier) {
         Objects.requireNonNull(multiplier, "Multiplier can't be null");
         try {
-            sendMessage(add(objectWith("multiplier", multiplier.toJson()), "enable", true), MessageType.MULTIPLIER_UPDATE);
+            sendMessage(new Message(MessageType.MULTIPLIER_UPDATE, add(objectWith("multiplier", multiplier.toJson()), "enable", true)));
         } catch (Exception ex) {
             CoinsAPI.getPlugin().log("An unexpected error has occurred while enabling a multiplier over messaging service.");
             CoinsAPI.getPlugin().log("Check plugin log files for more information, please report this bug on https://github.com/Beelzebu/Coins3-API/issues");
@@ -95,7 +120,7 @@ public abstract class AbstractMessagingService {
     public final void disableMultiplier(Multiplier multiplier) {
         Objects.requireNonNull(multiplier, "Multiplier can't be null");
         try {
-            sendMessage(objectWith("multiplier", multiplier.toJson()), MessageType.MULTIPLIER_DISABLE);
+            sendMessage(new Message(MessageType.MULTIPLIER_DISABLE, objectWith("multiplier", multiplier.toJson())));
         } catch (Exception ex) {
             CoinsAPI.getPlugin().log("An unexpected error has occurred while disabling a multiplier over messaging service.");
             CoinsAPI.getPlugin().log("Check plugin log files for more information, please report this bug on https://github.com/Beelzebu/Coins3-API/issues");
@@ -108,14 +133,14 @@ public abstract class AbstractMessagingService {
      * will request it to bungeecord and viceversa.
      */
     public final void requestMultipliers() {
-        sendMessage(new JsonObject(), MessageType.MULTIPLIER_REQUEST);
+        sendMessage(new Message(MessageType.MULTIPLIER_REQUEST, new JsonObject()));
     }
 
     /**
      * Send a request to get all executors from servers connected to this messaging service.
      */
     public final void requestExecutors() {
-        sendMessage(new JsonObject(), MessageType.EXECUTOR_REQUEST);
+        sendMessage(new Message(MessageType.EXECUTOR_REQUEST, new JsonObject()));
     }
 
     /**
@@ -126,24 +151,34 @@ public abstract class AbstractMessagingService {
     protected abstract void sendMessage(JsonObject message);
 
     /**
-     * Send a message in JSON format using this messaging service
+     * Send a {@link Message} over this messaging service
      *
-     * @param data what we should send
-     * @param type message type
+     * @param message message to send to other servers
      */
-    protected final void sendMessage(JsonObject data, MessageType type) {
-        sendMessage(new Message(type, data).toJson());
+    protected final void sendMessage(Message message) {
+        if (getType() == MessagingServiceType.NONE) {
+            switch (message.getType()) {
+                case USER_UPDATE:
+                case MULTIPLIER_DISABLE:
+                case MULTIPLIER_UPDATE:
+                    handleMessage(message.toJson());
+            }
+            return;
+        }
+        sendMessage(message);
     }
 
     protected final void handleMessage(JsonObject data) {
         Message message = CoinsAPI.getPlugin().getGson().fromJson(data, Message.class);
-        CoinsAPI.getPlugin().debug("&6Messaging Log: &7Received a new message: " + data);
-        MessageType type = message.getType();
-        switch (type) {
+        CoinsAPI.getPlugin().debug("&6Messaging: &7Handling message: " + data);
+        switch (message.getType()) {
             case USER_UPDATE: {
                 UUID uuid = UUID.fromString(message.getData().get("uuid").getAsString());
                 double coins = message.getData().get("coins").getAsDouble();
-                CoinsAPI.getPlugin().getBootstrap().callCoinsChangeEvent(uuid, CoinsAPI.getCoins(uuid), coins);
+                double oldCoins = message.getData().has("oldCoins") ? message.getData().get("oldCoins").getAsDouble() : coins;
+                if (coins != oldCoins) {
+                    CoinsAPI.getPlugin().getBootstrap().callCoinsChangeEvent(uuid, oldCoins, coins);
+                }
                 OptionalDouble optionalCoins = CoinsAPI.getPlugin().getCache().getCoins(uuid);
                 if (optionalCoins.isPresent() && optionalCoins.getAsDouble() == coins) {
                     return;
@@ -153,7 +188,7 @@ public abstract class AbstractMessagingService {
             break;
             case EXECUTOR_REQUEST: { // other server is requesting executors from this server.
                 CoinsAPI.getPlugin().loadExecutors();
-                ExecutorManager.getExecutors().forEach(ex -> sendMessage(objectWith("executor", ex.toJson()), MessageType.EXECUTOR_SEND));
+                ExecutorManager.getExecutors().forEach(ex -> sendMessage(new Message(MessageType.EXECUTOR_SEND, objectWith("executor", ex.toJson()))));
             }
             break;
             case EXECUTOR_SEND: { // other server sent an executor
@@ -161,7 +196,7 @@ public abstract class AbstractMessagingService {
             }
             break;
             case MULTIPLIER_REQUEST: { // other server is requesting multipliers from this server
-                CoinsAPI.getPlugin().getCache().getMultipliers().forEach(multiplier -> sendMessage(objectWith("multiplier", multiplier.toJson()), MessageType.MULTIPLIER_UPDATE));
+                CoinsAPI.getPlugin().getCache().getMultipliers().forEach(multiplier -> sendMessage(new Message(MessageType.MULTIPLIER_UPDATE, objectWith("multiplier", multiplier.toJson()))));
             }
             break;
             case MULTIPLIER_UPDATE: {

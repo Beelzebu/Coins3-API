@@ -227,7 +227,7 @@ public final class CoinsAPI {
                 }
                 return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Errors.Max value exceeded");
             }
-            PLUGIN.getMessagingService().publishUser(uuid, coins);
+            PLUGIN.getMessagingService().publishUser(uuid, coins, getCoins(uuid));
             return PLUGIN.getStorageProvider().setCoins(uuid, coins);
         } else {
             return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Errors.Unknown player", "%target%", uuid.toString());
