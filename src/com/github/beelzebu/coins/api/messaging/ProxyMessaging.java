@@ -18,6 +18,9 @@
  */
 package com.github.beelzebu.coins.api.messaging;
 
+import com.github.beelzebu.coins.api.CoinsAPI;
+import com.google.gson.JsonObject;
+
 /**
  * @author Beelzebu
  */
@@ -31,4 +34,10 @@ public abstract class ProxyMessaging extends AbstractMessagingService {
     }
 
     protected abstract void sendMessage(String message, boolean wait);
+
+    @Override
+    protected final void sendMessage(JsonObject jsonObject) {
+        Message message = CoinsAPI.getPlugin().getGson().fromJson(jsonObject, Message.class);
+        sendMessage(jsonObject.toString(), message.getType() != MessageType.MULTIPLIER_ENABLE);
+    }
 }

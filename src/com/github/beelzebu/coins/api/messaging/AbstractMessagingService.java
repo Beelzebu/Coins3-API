@@ -105,7 +105,7 @@ public abstract class AbstractMessagingService {
     public final void enableMultiplier(Multiplier multiplier) {
         Objects.requireNonNull(multiplier, "Multiplier can't be null");
         try {
-            sendMessage(new Message(MessageType.MULTIPLIER_UPDATE, add(objectWith("multiplier", multiplier.toJson()), "enable", true)));
+            sendMessage(new Message(MessageType.MULTIPLIER_ENABLE, objectWith("multiplier", multiplier.toJson())));
         } catch (Exception ex) {
             CoinsAPI.getPlugin().log("An unexpected error has occurred while enabling a multiplier over messaging service.");
             CoinsAPI.getPlugin().log("Check plugin log files for more information, please report this bug on https://github.com/Beelzebu/Coins3-API/issues");
@@ -147,9 +147,9 @@ public abstract class AbstractMessagingService {
     /**
      * Sub classes must override this to send the message so we can handle it before
      *
-     * @param message JSON message to send
+     * @param jsonObject JSON message to send
      */
-    protected abstract void sendMessage(JsonObject message);
+    protected abstract void sendMessage(JsonObject jsonObject);
 
     /**
      * Send a {@link Message} over this messaging service
@@ -202,20 +202,27 @@ public abstract class AbstractMessagingService {
             break;
             case MULTIPLIER_UPDATE: {
                 Multiplier multiplier = Multiplier.fromJson(message.getData().getAsJsonObject("multiplier").toString());
-                if (multiplier != null && !CoinsAPI.getPlugin().getCache().getMultiplier(multiplier.getId()).isPresent()) {
+                if (multiplier != null) {
                     Optional<Multiplier> optionalMultiplier = CoinsAPI.getPlugin().getCache().getMultiplier(multiplier.getId());
-                    if (optionalMultiplier.isPresent() && !optionalMultiplier.get().equals(multiplier)) {
+                    if (optionalMultiplier.isPresent()) {
+                        if (optionalMultiplier.get().equals(multiplier)) {
+                            return;
+                        }
                         CoinsAPI.getPlugin().debug("Received a different version of multiplier: " + multiplier.getId());
                         CoinsAPI.getPlugin().debug("Old multiplier: " + optionalMultiplier.get().toString());
                         CoinsAPI.getPlugin().debug("New multiplier: " + multiplier.toString());
-                        CoinsAPI.getPlugin().getCache().addMultiplier(multiplier); // override multiplier since received multiplier is different
                     }
+                    CoinsAPI.getPlugin().getCache().addMultiplier(multiplier); // override multiplier since received multiplier is different
                 }
             }
             break;
             case MULTIPLIER_ENABLE: {
                 Multiplier multiplier = Multiplier.fromJson(message.getData().getAsJsonObject("multiplier").toString());
-                CoinsAPI.getPlugin().getBootstrap().callMultiplierEnableEvent(multiplier);
+                if (multiplier != null) {
+                    CoinsAPI.getPlugin().getBootstrap().callMultiplierEnableEvent(CoinsAPI.getMultiplier(multiplier.getId()));
+                } else {
+                    CoinsAPI.getPlugin().debug("Received a null multiplier from messaging service");
+                }
             }
             break;
             case MULTIPLIER_DISABLE: { // remove multiplier from cache and storage
