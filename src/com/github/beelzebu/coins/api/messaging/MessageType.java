@@ -46,6 +46,10 @@ enum MessageType {
      */
     MULTIPLIER_UPDATE,
     /**
+     * Send a multiplier enable notification to other servers
+     */
+    MULTIPLIER_ENABLE,
+    /**
      * Disable a multiplier and
      */
     MULTIPLIER_DISABLE

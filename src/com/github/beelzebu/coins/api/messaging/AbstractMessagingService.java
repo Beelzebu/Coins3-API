@@ -25,6 +25,7 @@ import com.github.beelzebu.coins.api.executor.ExecutorManager;
 import com.github.beelzebu.coins.api.storage.StorageType;
 import com.google.gson.JsonObject;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.UUID;
 
@@ -201,12 +202,20 @@ public abstract class AbstractMessagingService {
             break;
             case MULTIPLIER_UPDATE: {
                 Multiplier multiplier = Multiplier.fromJson(message.getData().getAsJsonObject("multiplier").toString());
-                if (message.getData().has("enable") && message.getData().get("enable").getAsBoolean()) {
-                    CoinsAPI.getPlugin().getBootstrap().callMultiplierEnableEvent(multiplier);
-                }
                 if (multiplier != null && !CoinsAPI.getPlugin().getCache().getMultiplier(multiplier.getId()).isPresent()) {
-                    CoinsAPI.getPlugin().getCache().addMultiplier(multiplier);
+                    Optional<Multiplier> optionalMultiplier = CoinsAPI.getPlugin().getCache().getMultiplier(multiplier.getId());
+                    if (optionalMultiplier.isPresent() && !optionalMultiplier.get().equals(multiplier)) {
+                        CoinsAPI.getPlugin().debug("Received a different version of multiplier: " + multiplier.getId());
+                        CoinsAPI.getPlugin().debug("Old multiplier: " + optionalMultiplier.get().toString());
+                        CoinsAPI.getPlugin().debug("New multiplier: " + multiplier.toString());
+                        CoinsAPI.getPlugin().getCache().addMultiplier(multiplier); // override multiplier since received multiplier is different
+                    }
                 }
+            }
+            break;
+            case MULTIPLIER_ENABLE: {
+                Multiplier multiplier = Multiplier.fromJson(message.getData().getAsJsonObject("multiplier").toString());
+                CoinsAPI.getPlugin().getBootstrap().callMultiplierEnableEvent(multiplier);
             }
             break;
             case MULTIPLIER_DISABLE: { // remove multiplier from cache and storage
