@@ -159,19 +159,25 @@ public abstract class AbstractMessagingService {
     protected final void sendMessage(Message message) {
         if (getType() == MessagingServiceType.NONE) {
             switch (message.getType()) {
-                case USER_UPDATE:
-                case MULTIPLIER_DISABLE:
-                case MULTIPLIER_UPDATE:
-                    handleMessage(message.toJson());
+                case MULTIPLIER_REQUEST:
+                case EXECUTOR_REQUEST:
+                case EXECUTOR_SEND:
+                    return;
             }
+            handleMessage(message.toJson());
             return;
         }
         sendMessage(message);
     }
 
-    protected final void handleMessage(JsonObject data) {
-        Message message = CoinsAPI.getPlugin().getGson().fromJson(data, Message.class);
-        CoinsAPI.getPlugin().debug("&6Messaging: &7Handling message: " + data);
+    /**
+     * Handle received messages to update cache and call events.
+     *
+     * @param jsonObject JSON message received in the messaging service implementation.
+     */
+    protected final void handleMessage(JsonObject jsonObject) {
+        Message message = CoinsAPI.getPlugin().getGson().fromJson(jsonObject, Message.class);
+        CoinsAPI.getPlugin().debug("&6Messaging: &7Handling message: " + jsonObject);
         switch (message.getType()) {
             case USER_UPDATE: {
                 UUID uuid = UUID.fromString(message.getData().get("uuid").getAsString());
