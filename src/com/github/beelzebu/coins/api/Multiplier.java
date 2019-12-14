@@ -162,7 +162,7 @@ public final class Multiplier {
     }
 
     private long getAndCheckRemainingMillis() {
-        if (!isEnabled()) {
+        if (!enabled) {
             return 0;
         }
         if (System.currentTimeMillis() >= start + TimeUnit.MINUTES.toMillis(data.getMinutes())) {
