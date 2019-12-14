@@ -26,15 +26,37 @@ import com.google.gson.JsonObject;
  */
 public abstract class ProxyMessaging extends AbstractMessagingService {
 
+    /**
+     * Messaging channel to register in bungeecord and bukkit.
+     */
     protected static final String CHANNEL = "coins:updates";
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public final MessagingServiceType getType() {
         return MessagingServiceType.BUNGEECORD;
     }
 
+    /**
+     * Send a message through this messaging service, using {@link #CHANNEL}.
+     *
+     * <p> Since bungeecord and bukkit messaging channels need a player connected to send the message we must specify if
+     * we want to the server to wait until there is a player online to try to send the message or just skip it.
+     *
+     * <p> Currently only {@link MessageType#MULTIPLIER_ENABLE} message is skipped when there is no online player, this
+     * is handled in {@link #sendMessage(JsonObject)} implementation.
+     *
+     * @param message message to send through this messaging service.
+     * @param wait    if we should wait for a player to join and handle this message when there is no player in the
+     *                server sending this message.
+     */
     protected abstract void sendMessage(String message, boolean wait);
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     protected final void sendMessage(JsonObject jsonObject) {
         Message message = CoinsAPI.getPlugin().getGson().fromJson(jsonObject, Message.class);
