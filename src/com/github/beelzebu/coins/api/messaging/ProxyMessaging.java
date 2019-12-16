@@ -18,7 +18,7 @@
  */
 package com.github.beelzebu.coins.api.messaging;
 
-import com.github.beelzebu.coins.api.CoinsAPI;
+import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.google.gson.JsonObject;
 
 /**
@@ -30,6 +30,10 @@ public abstract class ProxyMessaging extends AbstractMessagingService {
      * Messaging channel to register in bungeecord and bukkit.
      */
     protected static final String CHANNEL = "coins:updates";
+
+    public ProxyMessaging(CoinsPlugin coinsPlugin) {
+        super(coinsPlugin);
+    }
 
     /**
      * {@inheritDoc}
@@ -59,7 +63,7 @@ public abstract class ProxyMessaging extends AbstractMessagingService {
      */
     @Override
     protected final void sendMessage(JsonObject jsonObject) {
-        Message message = CoinsAPI.getPlugin().getGson().fromJson(jsonObject, Message.class);
+        Message message = coinsPlugin.getGson().fromJson(jsonObject, Message.class);
         sendMessage(jsonObject.toString(), message.getType() != MessageType.MULTIPLIER_ENABLE);
     }
 }

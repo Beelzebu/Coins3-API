@@ -18,6 +18,7 @@
  */
 package com.github.beelzebu.coins.api;
 
+import com.github.beelzebu.coins.api.cache.CacheProvider;
 import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.github.beelzebu.coins.api.utils.CoinsEntry;
 import com.github.beelzebu.coins.api.utils.CoinsSet;
@@ -31,6 +32,7 @@ import java.util.OptionalDouble;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * @author Beelzebu
@@ -38,6 +40,7 @@ import javax.annotation.Nonnull;
 @SuppressWarnings({"WeakerAccess", "unused"})
 public final class CoinsAPI {
 
+    public static final String API_VERSION = "3.0-SNAPSHOT";
     private static final DecimalFormat DF = new DecimalFormat("#.#");
     private static final CoinsEntry<CoinsSet<CoinsUser>, Long> CACHED_TOP = new CoinsEntry<>(new CoinsSet<>(), -1L);
     private static final long TOP_CACHE_MILLIS = 30000;
@@ -69,7 +72,7 @@ public final class CoinsAPI {
     public static double getCoins(@Nonnull UUID uuid) {
         OptionalDouble optionalCoins = PLUGIN.getCache().getCoins(uuid);
         if (!optionalCoins.isPresent()) { // send coins to other servers and cache
-            PLUGIN.getMessagingService().publishUser(uuid, optionalCoins.orElseGet(() -> PLUGIN.getStorageProvider().getCoins(uuid)));
+            PLUGIN.getMessagingService().publishUser(uuid, PLUGIN.getStorageProvider().getCoins(uuid));
         }
         // try again to get coins from cache, otherwise fallback to database
         return PLUGIN.getCache().getCoins(uuid).orElseGet(() -> {
@@ -218,13 +221,13 @@ public final class CoinsAPI {
      * @return {@link CoinsResponse}
      */
     public static CoinsResponse setCoins(@Nonnull UUID uuid, double coins) {
+        if (uuid.equals(MultiplierData.SERVER_UUID) && coins != 0) {
+            return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Can't set balance for multipliers account to any value different to 0");
+        }
         if (isindb(uuid)) {
-            if (Double.isNaN(coins) || Double.isInfinite(coins) || new BigDecimal(coins).compareTo(new BigDecimal(Double.MAX_VALUE)) > 0) {
+            if (Double.isNaN(coins) || Double.isInfinite(coins) || new BigDecimal(getCoins(uuid) + coins).compareTo(new BigDecimal(Double.MAX_VALUE)) > 0) {
                 PLUGIN.log("An API call tried to exceed the max amount of coins that a account can handle.");
                 PLUGIN.log(PLUGIN.getStackTrace(new IllegalArgumentException()));
-                if (getCoins(uuid) < coins) {
-                    return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Errors.No Coins");
-                }
                 return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Errors.Max value exceeded");
             }
             PLUGIN.getMessagingService().publishUser(uuid, coins, getCoins(uuid));
@@ -265,6 +268,11 @@ public final class CoinsAPI {
      * @return {@link CoinsResponse}
      */
     public static CoinsResponse payCoins(@Nonnull UUID from, @Nonnull UUID to, double amount) {
+        Objects.requireNonNull(from, "from UUID can't be null");
+        Objects.requireNonNull(to, "to UUID can't be null");
+        if (from == MultiplierData.SERVER_UUID || to == MultiplierData.SERVER_UUID) {
+            return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "Can't pay from or to server account.");
+        }
         if (getCoins(from) >= amount) {
             CoinsResponse takeResponse = takeCoins(from, amount);
             if (takeResponse.isSuccess()) {
@@ -333,7 +341,7 @@ public final class CoinsAPI {
         if (CACHED_TOP.getValue() != null && CACHED_TOP.getValue() >= System.currentTimeMillis() && CACHED_TOP.getKey().size() <= top) {
             return CACHED_TOP.getKey().getFirst(top).toArray(new CoinsUser[top]);
         } else {
-            CACHED_TOP.setKey(new CoinsSet<>(PLUGIN.getStorageProvider().getTopPlayers(top).stream().filter(Objects::nonNull).collect(Collectors.toSet())));
+            CACHED_TOP.setKey(new CoinsSet<>(PLUGIN.getStorageProvider().getTopPlayers(top).stream().filter(Objects::nonNull).filter(coinsUser -> !coinsUser.getUniqueId().equals(MultiplierData.SERVER_UUID)).collect(Collectors.toSet())));
             CACHED_TOP.setValue(System.currentTimeMillis() + TOP_CACHE_MILLIS);
             return CACHED_TOP.getKey().toArray(new CoinsUser[top]);
         }
@@ -378,6 +386,20 @@ public final class CoinsAPI {
         return multiplier;
     }
 
+    /**
+     * Create a new multiplier for a player and save it.
+     *
+     * <p> When a multiplier is created his ID is always -1 (which is invalid, so multipliers with this ID can't be
+     * enabled and will throw an exception), so this method will save it and the storage provider will set the ID to a
+     * valid value.
+     *
+     * @param uuid    UUID of the player who owns this multiplier.
+     * @param amount  Amount for the multiplier.
+     * @param minutes Duration for this multiplier.
+     * @param server  Server for this multiplier.
+     * @param type    Multiplier Type.
+     * @return {@link Multiplier} created with the provided data and a valid ID.
+     */
     public static Multiplier createMultiplier(UUID uuid, int amount, int minutes, String server, MultiplierType type) {
         MultiplierData multiplierData;
         if (uuid != null) {
@@ -389,31 +411,76 @@ public final class CoinsAPI {
         return PLUGIN.getStorageProvider().saveMultiplier(multiplier);
     }
 
+    /**
+     * Create a new multiplier with server owner and save it.
+     *
+     * <p> {@link MultiplierData} for this multiplier will always return {@link MultiplierData#SERVER_UUID} for
+     * {@link MultiplierData#getEnablerUUID()} and {@link MultiplierData#SERVER_NAME} for
+     * {@link MultiplierData#getEnablerName()}
+     *
+     * <p> When a multiplier is created his ID is always -1 (which is invalid, so multipliers with this ID can't be
+     * enabled and will throw an exception), so this method will save it and the storage provider will set the ID to a
+     * valid value.
+     *
+     * @param amount  Amount for the multiplier.
+     * @param minutes Duration for this multiplier.
+     * @param server  Server for this multiplier.
+     * @param type    Multiplier Type.
+     * @return {@link Multiplier} created with the provided data and a valid ID.
+     */
     public static Multiplier createMultiplier(int amount, int minutes, String server, MultiplierType type) {
         return createMultiplier(null, amount, minutes, server, type);
     }
 
     /**
-     * Get all multipliers attached to a server from the database.
+     * Get all multipliers attached to a server from cache.
      *
-     * @param server Server name to search in the database to get multipliers.
-     * @return Collection containing all multipliers for the specified server from the database.
+     * @param server Server name for the multiplier.
+     * @return {@link Collection<Multiplier>} containing all cached multipliers for the specified server from cache.
+     * @see Multiplier#getServer()
      */
     public static Collection<Multiplier> getMultipliers(@Nonnull String server) {
-        return PLUGIN.getStorageProvider().getMultipliers(server);
+        return PLUGIN.getCache().getMultipliers(server);
+    }
+
+    /**
+     * Get all enabled multipliers associated with the specified server from cache.
+     *
+     * <p> These multipliers can be any {@link MultiplierType}, this means that {@link MultiplierType#GLOBAL} and
+     * {@link MultiplierType#PERSONAL} multipliers will be in the collection too.
+     *
+     * @param server Server name for the multiplier.
+     * @return {@link Collection<Multiplier>} containing all enabled multipliers for the specified server from cache.
+     * @see Multiplier#getServer()
+     */
+    public static Collection<Multiplier> getEnabledMultipliers(@Nonnull String server) {
+        Objects.requireNonNull(server, "Server name can't be null");
+        return PLUGIN.getCache().getEnabledMultipliers(server);
     }
 
     /**
      * Get all enabled or disabled multipliers attached to a server from the database.
      *
      * @param server  Server name to search in the database to get multipliers.
-     * @param enabled If the storage provider should lookup for enabled or disabled multipliers.
+     * @param enabled If we should get only enabled multipliers, if false this method will return all multipliers.
      * @return Collection containing all multipliers for the specified server from the database.
      */
     public static Collection<Multiplier> getMultipliers(@Nonnull String server, boolean enabled) {
-        return PLUGIN.getStorageProvider().getMultipliers(server, enabled);
+        if (enabled) {
+            return PLUGIN.getCache().getEnabledMultipliers(server);
+        } else {
+            return PLUGIN.getCache().getMultipliers(server);
+        }
     }
 
+    /**
+     * Get all usable multipliers for a player in the current server, the purpose of this method is to be used to
+     * calculate the total amount to multiply coins when using {@link CoinsAPI#addCoins(UUID, double, boolean)}
+     *
+     * @param uuid UUID of the player to look for
+     * @return {@link Collection<Multiplier>} containing all usable multipliers for this player from cache.
+     * @see Multiplier#canUsePlayer(UUID)
+     */
     public static Collection<Multiplier> getUsableMultipliers(@Nonnull UUID uuid) {
         return PLUGIN.getCache().getUsableMultipliers(uuid);
     }
@@ -425,38 +492,7 @@ public final class CoinsAPI {
      * @return multipliers of the player in this server.
      */
     public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid) {
-        return getMultipliersFor(uuid, false);
-    }
-
-    /**
-     * Get all owned multipliers for a player from the database.
-     *
-     * @param uuid              player to get multipliers from the storageProvider.
-     * @param onlyCurrentServer if the method should only return multipliers available in the current server.
-     * @return multipliers of the player in this server.
-     */
-    public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid, boolean onlyCurrentServer) {
-        if (onlyCurrentServer) {
-            return PLUGIN.getStorageProvider().getMultipliersFor(uuid, PLUGIN.getConfig().getServerName());
-        } else {
-            return PLUGIN.getStorageProvider().getMultipliersFor(uuid);
-        }
-    }
-
-    /**
-     * Get all enabled or disabled multipliers owned by a player from the database.
-     *
-     * @param uuid              player to get multipliers from the storage provider.
-     * @param onlyCurrentServer if the method should only return multipliers available in the current server.
-     * @param enabled           if the storage provider should lookup for enabled or disabled multipliers.
-     * @return multipliers of the player in this server.
-     */
-    public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid, boolean onlyCurrentServer, boolean enabled) {
-        if (onlyCurrentServer) {
-            return PLUGIN.getStorageProvider().getMultipliersFor(uuid, PLUGIN.getConfig().getServerName(), enabled);
-        } else {
-            return PLUGIN.getStorageProvider().getMultipliersFor(uuid, enabled);
-        }
+        return getMultipliersFor(uuid, getServerName());
     }
 
     /**
@@ -466,20 +502,37 @@ public final class CoinsAPI {
      * @param server where we should get the multipliers.
      * @return multipliers of the player in that server.
      */
-    public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid, @Nonnull String server) {
-        return PLUGIN.getStorageProvider().getMultipliersFor(uuid, server);
+    public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid, @Nullable String server) {
+        if (Objects.isNull(server)) {
+            return PLUGIN.getCache().getMultipliers().stream().filter(multiplier -> multiplier.getData().getEnablerUUID().equals(uuid)).collect(Collectors.toSet());
+        } else {
+            return PLUGIN.getCache().getMultipliers().stream().filter(multiplier -> multiplier.getData().getEnablerUUID().equals(uuid)).filter(multiplier -> Objects.equals(multiplier.getServer(), server)).collect(Collectors.toSet());
+        }
     }
 
     /**
-     * Get all enabled or disabled multipliers owned by a player in a server.
+     * Get all multipliers for a player, filtering if multipliers must be enabled or not from cache.
      *
-     * @param uuid    player to get multipliers from the database.
-     * @param server  where we should get the multipliers.
-     * @param enabled if the storage provider should lookup for enabled or disabled multipliers.
+     * @param uuid    UUID of the player to get multipliers from the cache.
+     * @param server  Server name for the multipliers.
+     * @param enabled f we should get only enabled multipliers, if false this method will return all multipliers.
      * @return multipliers of the player in that server.
      */
     public static Collection<Multiplier> getMultipliersFor(@Nonnull UUID uuid, @Nonnull String server, boolean enabled) {
-        return PLUGIN.getStorageProvider().getMultipliersFor(uuid, server, enabled);
+        if (enabled) {
+            return PLUGIN.getCache().getEnabledMultipliers(server).stream().filter(multiplier -> multiplier.getData().getEnablerUUID().equals(uuid)).collect(Collectors.toSet());
+        } else {
+            return getMultipliersFor(uuid, server);
+        }
+    }
+
+    /**
+     * Get name of the current server where the plugin is being executed.
+     *
+     * @return Server name from {@link CoinsPlugin#getMultipliersConfig()}
+     */
+    public static String getServerName() {
+        return PLUGIN.getMultipliersConfig().getString("Server name", "default").toLowerCase();
     }
 
     public static CoinsPlugin getPlugin() {
@@ -489,6 +542,18 @@ public final class CoinsAPI {
     public static void setPlugin(@Nonnull CoinsPlugin plugin) {
         if (PLUGIN == null) {
             PLUGIN = plugin;
+            plugin.getBootstrap().scheduleAsync(plugin.getCache().getMultiplierPoller(), CacheProvider.POLLER_INTERVAL_SECONDS * 20); // we must multiply it by 20 because interval is in ticks
+            CoinsResponse create = createPlayer(MultiplierData.SERVER_NAME, MultiplierData.SERVER_UUID, 0);
+            if (create.isFailed()) {
+                plugin.log("An error has occurred while creating account for server multipliers in the database.");
+                plugin.log(create.getMessage(""));
+                return;
+            }
+            CoinsResponse set = setCoins(MultiplierData.SERVER_UUID, 0);
+            if (set.isFailed()) {
+                plugin.log("An error has occurred while setting balance to 0 for server multipliers account in the database.");
+                plugin.log(set.getMessage(""));
+            }
         } else {
             throw new IllegalStateException("Plugin was already set");
         }

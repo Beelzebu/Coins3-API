@@ -32,6 +32,8 @@ import javax.annotation.Nonnull;
  */
 public interface StorageProvider {
 
+    int DATABASE_VERSION = 3;
+
     void setup();
 
     void shutdown();
@@ -54,7 +56,7 @@ public interface StorageProvider {
 
     LinkedHashSet<CoinsUser> getTopPlayers(int top);
 
-    Multiplier saveMultiplier(Multiplier multiplier);
+    Multiplier saveMultiplier(Multiplier multiplier) throws RuntimeException;
 
     Multiplier getMultiplier(int id);
 
@@ -76,8 +78,9 @@ public interface StorageProvider {
 
     void deleteMultiplier(Multiplier multiplier);
 
+    void updateMultiplier(Multiplier multiplier);
+
     LinkedHashMap<String, Double> getAllPlayers();
 
     StorageType getStorageType();
-
 }

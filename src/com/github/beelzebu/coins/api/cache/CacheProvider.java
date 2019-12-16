@@ -18,22 +18,31 @@
  */
 package com.github.beelzebu.coins.api.cache;
 
+import com.github.beelzebu.coins.api.CoinsAPI;
 import com.github.beelzebu.coins.api.Multiplier;
+import com.github.beelzebu.coins.api.MultiplierData;
+import com.github.beelzebu.coins.api.MultiplierType;
+import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 
 /**
  * @author Beelzebu
  */
 public interface CacheProvider {
+
+    int POLLER_INTERVAL_SECONDS = 120;
 
     /**
      * Start and setup all required settings for this {@link CacheProvider} to work
@@ -83,7 +92,24 @@ public interface CacheProvider {
      * @return {@link Collection<Multiplier>} containing all cached multipliers that the specified player can use.
      */
     default Collection<Multiplier> getUsableMultipliers(UUID uniqueId) {
+        Objects.requireNonNull(uniqueId, "uniqueId can't be null");
         return getMultipliers().stream().filter(multiplier -> multiplier.canUsePlayer(uniqueId)).collect(Collectors.toSet());
+    }
+
+    /**
+     * Get a collection of all multipliers for the specified server without any other filter.
+     *
+     * <p> Please note that {@link Multiplier#getServer()} always return {@link CoinsAPI#getServerName()} as the
+     * server when {@link MultiplierType} in {@link MultiplierData)} attached to the multiplier is
+     * {@link MultiplierType#GLOBAL}
+     *
+     * @param server Name of the server to lookup.
+     * @return {@link Collection<Multiplier>} containing all cached multipliers that are for the specified server.
+     * @see Multiplier#getServer()
+     */
+    default Collection<Multiplier> getMultipliers(@Nonnull String server) {
+        Objects.requireNonNull(server, "Server name can't be null");
+        return getMultipliers().stream().filter(multiplier -> multiplier.getServer().equals(server)).collect(Collectors.toSet());
     }
 
     /**
@@ -93,20 +119,10 @@ public interface CacheProvider {
      * @param server Server name to get multipliers.
      * @return {@link Collection<Multiplier>} containing enabled multipliers for the specified server.
      */
-    default Collection<Multiplier> getMultipliers(@Nonnull String server) {
-        Collection<Multiplier> multipliers = getMultipliers();
-        Stream<Multiplier> multiplierStream = multipliers.stream().filter(multiplier -> multiplier.getServer().equals(server));
-        if (multiplierStream.anyMatch(Multiplier::isEnabled)) {
-            return multiplierStream.filter(Multiplier::isEnabled).collect(Collectors.toSet());
-        }
-        // TODO: enable server and global multiplier instead of just one queued multiplier.
-        Optional<Multiplier> optionalMultiplier = multiplierStream.filter(Multiplier::isQueue).min(Comparator.comparingLong(Multiplier::getQueueStart)); // get first queued multiplier
-        if (optionalMultiplier.isPresent()) {
-            Multiplier multiplier = optionalMultiplier.get();
-            multiplier.enable();
-            return Collections.singleton(multiplier);
-        }
-        return Collections.emptySet();
+    default Collection<Multiplier> getEnabledMultipliers(@Nonnull String server) {
+        Objects.requireNonNull(server, "Server name can't be null");
+        getMultiplierPoller().checkMultipliersForDisable();
+        return getMultipliers().stream().filter(multiplier -> multiplier.getServer().equals(CoinsAPI.getServerName())).filter(Multiplier::isEnabled).collect(Collectors.toSet());
     }
 
     /**
@@ -135,7 +151,7 @@ public interface CacheProvider {
      *
      * @return {@link Set<UUID>} containing all UUIDs of cached players.
      */
-    Set<UUID> getPlayers();
+    Collection<UUID> getPlayers();
 
     /**
      * Get {@link CacheType} for the cache in use.
@@ -143,4 +159,72 @@ public interface CacheProvider {
      * @return {@link CacheType} for this provider.
      */
     CacheType getCacheType();
+
+    MultiplierPoller getMultiplierPoller();
+
+    class MultiplierPoller implements Runnable {
+
+        private final CoinsPlugin plugin;
+
+        public MultiplierPoller(CoinsPlugin plugin) {
+            this.plugin = plugin;
+        }
+
+        @Override
+        public void run() {
+            loadMultipliersIntoCache();
+            checkCachedMultipliers();
+        }
+
+        /**
+         * Load all multipliers from database and cache multipliers owned by online players, overriding cached
+         * multipliers if multiplier from database has any difference.
+         */
+        public void loadMultipliersIntoCache() {
+            Iterator<Multiplier> multipliers = plugin.getStorageProvider().getMultipliers().iterator();
+            while (multipliers.hasNext()) {
+                Multiplier multiplier = multipliers.next();
+                if (plugin.getBootstrap().isOnline(multiplier.getData().getEnablerUUID())) {
+                    Optional<Multiplier> cachedMultiplier = plugin.getCache().getMultiplier(multiplier.getId());
+                    if (cachedMultiplier.isPresent() && cachedMultiplier.get().equals(multiplier)) {
+                        plugin.log("Multiplier #" + multiplier.getId() + " is already cached but multiplier " +
+                                "with same id from the database was found and with different data");
+                        plugin.log("Overriding cached multiplier #" + multiplier.getId() + " with multiplier from database");
+                        plugin.log("Cached multiplier: " + cachedMultiplier.get().toString());
+                        plugin.log("Stored multiplier: " + multiplier.toString());
+                        plugin.getCache().addMultiplier(multiplier);
+                    }
+                    if (!cachedMultiplier.isPresent()) {
+                        plugin.getCache().addMultiplier(multiplier);
+                    }
+                    multipliers.remove();
+                }
+            }
+        }
+
+        public void checkCachedMultipliers() {
+            checkMultipliersForDisable();
+            List<Multiplier> multipliers = new ArrayList<>(plugin.getCache().getMultipliers());
+            if (multipliers.isEmpty()) { // there is no enabled multiplier for this server
+                multipliers = new ArrayList<>(plugin.getCache().getMultipliers()); // fetch multipliers again
+                multipliers = multipliers.stream().filter(Multiplier::isQueue).collect(Collectors.toList());
+                multipliers.sort(Comparator.comparingLong(Multiplier::getQueueStart));
+                Iterator<Multiplier> it = multipliers.iterator();
+                while (it.hasNext()) {
+                    Multiplier multiplier = it.next();
+                    if (multiplier.canBeEnabled()) { // this method will get all enabled multipliers and check if it can be enabled
+                        multiplier.enable();
+                    }
+                    it.remove();
+                }
+            }
+        }
+
+        public void checkMultipliersForDisable() {
+            // create a new set to avoid any ConcurrentModificationException
+            new HashSet<>(plugin.getCache().getMultipliers()).stream()
+                    .filter(multiplier -> multiplier.getServer().equals(CoinsAPI.getServerName())) // filter multiplier by server
+                    .forEach(Multiplier::isEnabled); // check if multiplier is enabled, Multiplier#isEnabled will remove it from cache if is disabled
+        }
+    }
 }

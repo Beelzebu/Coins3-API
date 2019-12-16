@@ -30,6 +30,8 @@ import javax.annotation.Nonnull;
  */
 public final class StringUtils {
 
+    public static final char COLOR_CHAR = '§';
+
     @Nonnull
     public static String rep(String msg) {
         if (msg == null) {
@@ -38,7 +40,7 @@ public final class StringUtils {
         if (CoinsAPI.getPlugin() != null) {
             msg = msg.replace("%prefix%", CoinsAPI.getPlugin().getConfig().getString("Prefix", "&c&lCoins &6&l>&7"));
         }
-        return CoinsAPI.getPlugin() != null ? CoinsAPI.getPlugin().translateColor(msg) : msg;
+        return msg.replace('&', COLOR_CHAR);
     }
 
     @Nonnull

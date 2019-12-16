@@ -18,11 +18,10 @@
  */
 package com.github.beelzebu.coins.api.config;
 
-import com.github.beelzebu.coins.api.CoinsAPI;
 import com.github.beelzebu.coins.api.cache.CacheType;
 import com.github.beelzebu.coins.api.messaging.MessagingServiceType;
+import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.github.beelzebu.coins.api.storage.StorageType;
-import java.io.File;
 import java.util.Collections;
 import java.util.List;
 
@@ -31,8 +30,10 @@ import java.util.List;
  */
 public abstract class CoinsConfig extends AbstractConfigFile {
 
-    public CoinsConfig(File file) {
-        super(file);
+    protected CoinsPlugin coinsPlugin;
+
+    public CoinsConfig(CoinsPlugin coinsPlugin) {
+        this.coinsPlugin = coinsPlugin;
     }
 
     // #EasterEgg
@@ -42,23 +43,31 @@ public abstract class CoinsConfig extends AbstractConfigFile {
     }
 
     public boolean useBungee() {
-        return CoinsAPI.getPlugin().getMessagingService().getType().equals(MessagingServiceType.BUNGEECORD);
+        return coinsPlugin.getMessagingService().getType().equals(MessagingServiceType.BUNGEECORD);
     }
 
     public boolean isRedisLoadMultipliers() {
         return getBoolean("Redis.Load Multipliers", true);
     }
 
-    public List<String> getCommandAliases() {
-        return getStringList("General.Command.Aliases", Collections.emptyList());
-    }
-
     public String getCommand() {
-        return getString("General.Command.Name", "coins");
+        return getString("General.Command.Coins.Name", "coins");
     }
 
-    public String getServerName() {
-        return getString("Multipliers.Server", "default");
+    public String getCommandDescription() {
+        return getString("General.Command.Coins.Description", "Base command of the Coins plugin");
+    }
+
+    public String getCommandUsage() {
+        return getString("General.Command.Coins.Usage", "/coins");
+    }
+
+    public String getCommandPermission() {
+        return getString("General.Command.Coins.Permission", "coins.use");
+    }
+
+    public List<String> getCommandAliases() {
+        return getStringList("General.Command.Coins.Aliases", Collections.emptyList());
     }
 
     public StorageType getStorageType() {
@@ -66,7 +75,7 @@ public abstract class CoinsConfig extends AbstractConfigFile {
         try {
             return StorageType.valueOf(getString("Storage Type", "sqlite").toUpperCase());
         } catch (IllegalArgumentException ex) {
-            CoinsAPI.getPlugin().log("You have defined a invalid storage type in the config.");
+            coinsPlugin.log("You have defined a invalid storage type in the config.");
         }
         return type;
     }
@@ -76,7 +85,7 @@ public abstract class CoinsConfig extends AbstractConfigFile {
         try {
             return MessagingServiceType.valueOf(getString("Messaging Service", "none").toUpperCase());
         } catch (IllegalArgumentException ex) {
-            CoinsAPI.getPlugin().log("You have defined a invalid storage type in the config.");
+            coinsPlugin.log("You have defined a invalid storage type in the config.");
         }
         return type;
     }
@@ -86,7 +95,7 @@ public abstract class CoinsConfig extends AbstractConfigFile {
         try {
             return CacheType.valueOf(getString("Cache", "local").toUpperCase());
         } catch (IllegalArgumentException ex) {
-            CoinsAPI.getPlugin().log("You have defined a invalid cache type in the config.");
+            coinsPlugin.log("You have defined a invalid cache type in the config.");
         }
         return type;
     }
@@ -97,5 +106,9 @@ public abstract class CoinsConfig extends AbstractConfigFile {
 
     public boolean isDebugFile() {
         return getBoolean("General.Logging.Debug.File", true);
+    }
+
+    public int getDatabaseVersion() {
+        return getInt("Database Version", 1);
     }
 }

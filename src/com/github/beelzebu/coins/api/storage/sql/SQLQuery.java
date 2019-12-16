@@ -91,20 +91,20 @@ public enum SQLQuery {
      * </br>
      * <strong>Params:</strong>
      * <ul>
-     * <li> Servername for the multiplier.</li>
-     * <li> UUID of the owner of the multiplier.</li>
-     * <li> Type of this multiplier.</li>
-     * <li> Amount of this multiplier.</li>
-     * <li> Minutes that the multiplier must be enabled.</li>
-     * <li> If the multiplier must be added to the queue.</li>
-     * <li> If the multiplier is enabled</li>
+     * <li> server - server name</li>
+     * <li> type - multiplier type</li>
+     * <li> amount - integer representing the amount</li>
+     * <li> minutes - integer representing the minutes</li>
+     * <li> start - long representing system millis when this multiplier was enabled</li>
+     * <li> queue - long representing system millis when this multiplier was queued</li>
+     * <li> data_id - id of player in data table</li>
      * </ul>
      *
      * @see MultiplierType
      */
     CREATE_MULTIPLIER("INSERT INTO `" + SQLDatabase.MULTIPLIERS_TABLE + "`" +
-            "(`id`, `server`, `type`, `amount`, `minutes`, `start`, `enabled`, `queue`, `data_id`) VALUES " +
-            "(null, ?, ?, ?, ?, ?, ?, ?, (SELECT id FROM `" + SQLDatabase.DATA_TABLE + "` WHERE uuid = ?));"),
+            "(`id`, `server`, `type`, `amount`, `minutes`, `start`, `queue`, `data_id`) VALUES " +
+            "(null, ?, ?, ?, ?, ?, ?, (SELECT id FROM `" + SQLDatabase.DATA_TABLE + "` WHERE uuid = ?));"),
     /**
      * Select top users from the database.
      * </br>
@@ -140,7 +140,8 @@ public enum SQLQuery {
      * <li> Multiplier ID</li>
      * </ul>
      */
-    ENABLE_MULTIPLIER("UPDATE " + SQLDatabase.MULTIPLIERS_TABLE + " SET enabled = true WHERE id = ?;"),
+    ENABLE_MULTIPLIER("UPDATE " + SQLDatabase.MULTIPLIERS_TABLE + " SET start = ?, queue = ? WHERE id = ?;"),
+    UPDATE_MULTIPLIER("UPDATE " + SQLDatabase.MULTIPLIERS_TABLE + " SET server = ?, type = ?, amount = ?, minutes = ?, start = ?, queue = ?, data_id = (SELECT id FROM " + SQLDatabase.DATA_TABLE + " WHERE uuid = ?) WHERE id = ?"),
     /**
      * Select all multipliers from the database.
      */

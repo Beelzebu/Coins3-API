@@ -39,6 +39,7 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 
 /**
@@ -70,8 +71,7 @@ public abstract class SQLDatabase implements StorageProvider {
     public final CoinsResponse createPlayer(@Nonnull UUID uuid, @Nonnull String name, double balance) {
         try (Connection c = getConnection()) {
             if (_isindb(c, uuid) || _isindb(c, name)) {
-                updatePlayer(uuid, name);
-                return CoinsResponse.SUCCESS;
+                return updatePlayer(uuid, name);
             }
             try (PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.CREATE_USER, uuid, name, balance, System.currentTimeMillis())) {
                 plugin.debug("Creating data for player: " + name + " in the database.");
@@ -96,26 +96,28 @@ public abstract class SQLDatabase implements StorageProvider {
                     try (PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.UPDATE_USER_NAME_LOGIN, name, System.currentTimeMillis(), uuid)) {
                         ps.executeUpdate();
                         plugin.debug("Updated the name for '" + uuid + "' (" + name + ")");
-                        plugin.debug("Old name: %s, new name %s", oldName, name);
+                        plugin.debug(String.format("Old name: %s, new name %s", oldName, name));
                     }
                 }
                 UUID oldUUID = getUUID(c, name);
-                if (oldUUID != uuid) {
+                if (!Objects.equals(oldUUID, uuid)) {
                     try (PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.UPDATE_USER_UUID_LOGIN, uuid, System.currentTimeMillis(), name)) {
                         ps.executeUpdate();
                         plugin.debug("Updated the UUID for '" + name + "' (" + uuid + ")");
-                        plugin.debug("Old UUID: %s, new UUID %s", oldUUID, uuid);
+                        plugin.debug(String.format("Old UUID: %s, new UUID %s", oldUUID, uuid));
                     }
                 }
             } else if (plugin.getBootstrap().isOnline(name) && !CoinsAPI.isindb(name)) {
                 plugin.debug(name + " isn't in the database, but is online and a plugin is requesting his balance.");
-                CoinsAPI.createPlayer(name, uuid);
+                return CoinsAPI.createPlayer(name, uuid);
             } else {
-                plugin.debug("Tried to update a player that isn't in the database and is offline. UUID: %s, Name: %s", uuid, name);
+                plugin.debug(String.format("Tried to update a player that isn't in the database and is offline. UUID: %s, Name: %s", uuid, name));
+                return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, String.format("Tried to update a player that isn't in the database and is offline. UUID: %s, Name: %s", uuid, name));
             }
         } catch (SQLException ex) {
             plugin.log("An internal error has occurred updating the data for player '" + name + "', check the logs for more info.");
             plugin.debug(ex);
+            return new CoinsResponse(CoinsResponse.CoinsResponseType.FAILED, "SQLException: " + ex.getMessage());
         }
         return CoinsResponse.SUCCESS;
     }
@@ -239,7 +241,7 @@ public abstract class SQLDatabase implements StorageProvider {
             plugin.debug(multiplier.toJson().toString());
             plugin.debug(ex);
         }
-        return multiplier;
+        throw new RuntimeException("It is not possible to set ID for multiplier: " + multiplier.toString());
     }
 
     @Override
@@ -360,7 +362,7 @@ public abstract class SQLDatabase implements StorageProvider {
     @Override
     public void enableMultiplier(Multiplier multiplier) {
         try (Connection c = getConnection()) {
-            DatabaseUtils.prepareStatement(c, SQLQuery.ENABLE_MULTIPLIER, multiplier.getId()).executeUpdate();
+            DatabaseUtils.prepareStatement(c, SQLQuery.ENABLE_MULTIPLIER, multiplier.getStart(), multiplier.getQueueStart(), multiplier.getId()).executeUpdate();
         } catch (SQLException ex) {
             plugin.log("An error has occurred enabling the multiplier #" + multiplier.getId());
             plugin.debug(ex);
@@ -378,6 +380,16 @@ public abstract class SQLDatabase implements StorageProvider {
     }
 
     @Override
+    public void updateMultiplier(Multiplier multiplier) {
+        try (Connection c = getConnection()) {
+            DatabaseUtils.prepareStatement(c, SQLQuery.UPDATE_MULTIPLIER, multiplier.getServer(), multiplier.getData().getType(), multiplier.getData().getAmount(), multiplier.getData().getMinutes(), multiplier.getStart(), multiplier.getQueueStart(), multiplier.getData().getEnablerUUID(), multiplier.getId()).executeUpdate();
+        } catch (SQLException ex) {
+            plugin.log("An error has occurred enabling the multiplier #" + multiplier.getId());
+            plugin.debug(ex);
+        }
+    }
+
+    @Override
     public LinkedHashMap<String, Double> getAllPlayers() {
         LinkedHashMap<String, Double> data = new LinkedHashMap<>();
         try (Connection c = getConnection(); PreparedStatement ps = DatabaseUtils.prepareStatement(c, SQLQuery.SELECT_ALL_PLAYERS); ResultSet res = ps.executeQuery()) {
@@ -389,6 +401,15 @@ public abstract class SQLDatabase implements StorageProvider {
             plugin.debug(ex);
         }
         return data;
+    }
+
+    protected void purgeDatabase(Connection c) throws SQLException {
+        if (plugin.getConfig().getBoolean("General.Purge.Enabled", true) && plugin.getConfig().getInt("General.Purge.Days") > 0) {
+            try (Statement st = c.createStatement()) {
+                st.executeUpdate("DELETE FROM " + DATA_TABLE + " WHERE lastlogin < " + (System.currentTimeMillis() - TimeUnit.DAYS.toMillis(plugin.getConfig().getInt("General.Purge.Days", 60))) + ";");
+            }
+            plugin.debug("Inactive users were removed from the database.");
+        }
     }
 
     protected abstract void updateDatabase();
@@ -469,5 +490,15 @@ public abstract class SQLDatabase implements StorageProvider {
 
     private CoinsUser getUserFromResultSet(ResultSet res) throws SQLException {
         return new CoinsUser(UUID.fromString(res.getString("uuid")), res.getString("name"), res.getDouble("balance"));
+    }
+
+    protected long migratePlayersFromOldVersion(Connection currentDatabaseConnection, ResultSet oldDatabaseResultSet) throws SQLException {
+        long migrated = 0;
+        while (oldDatabaseResultSet.next()) { // start migrating data
+            DatabaseUtils.prepareStatement(currentDatabaseConnection, SQLQuery.CREATE_USER, oldDatabaseResultSet.getString("uuid"), oldDatabaseResultSet.getString("nick"), oldDatabaseResultSet.getDouble("balance"), oldDatabaseResultSet.getLong("lastlogin")).executeUpdate();
+            plugin.debug("Migrated the data for " + oldDatabaseResultSet.getString("nick") + " (" + oldDatabaseResultSet.getString("uuid") + ")");
+            migrated++;
+        }
+        return migrated;
     }
 }

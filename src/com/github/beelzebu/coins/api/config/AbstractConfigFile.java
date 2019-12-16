@@ -18,7 +18,6 @@
  */
 package com.github.beelzebu.coins.api.config;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -28,10 +27,7 @@ import java.util.Set;
  */
 public abstract class AbstractConfigFile {
 
-    protected final File file;
-
-    protected AbstractConfigFile(File file) {
-        this.file = file;
+    protected AbstractConfigFile() {
     }
 
     public String getString(String path) {

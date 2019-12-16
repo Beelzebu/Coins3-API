@@ -22,6 +22,7 @@ import com.github.beelzebu.coins.api.cache.CacheProvider;
 import com.github.beelzebu.coins.api.cache.CacheType;
 import com.github.beelzebu.coins.api.config.AbstractConfigFile;
 import com.github.beelzebu.coins.api.config.CoinsConfig;
+import com.github.beelzebu.coins.api.config.MultipliersConfig;
 import com.github.beelzebu.coins.api.messaging.AbstractMessagingService;
 import com.github.beelzebu.coins.api.messaging.MessagingServiceType;
 import com.github.beelzebu.coins.api.storage.StorageProvider;
@@ -84,6 +85,8 @@ public interface CoinsPlugin {
 
     CoinsConfig getConfig();
 
+    MultipliersConfig getMultipliersConfig();
+
     AbstractConfigFile getMessages(String lang);
 
     String getString(String path, String locale);
@@ -91,8 +94,6 @@ public interface CoinsPlugin {
     List<String> getStringList(String path, String locale);
 
     void reloadMessages();
-
-    String translateColor(String string);
 
     String removeColor(String string);
 }

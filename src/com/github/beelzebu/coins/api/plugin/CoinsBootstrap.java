@@ -20,7 +20,6 @@ package com.github.beelzebu.coins.api.plugin;
 
 import com.github.beelzebu.coins.api.Multiplier;
 import com.github.beelzebu.coins.api.config.AbstractConfigFile;
-import com.github.beelzebu.coins.api.config.CoinsConfig;
 import com.github.beelzebu.coins.api.messaging.ProxyMessaging;
 import java.io.File;
 import java.io.InputStream;
@@ -34,9 +33,6 @@ import java.util.logging.Logger;
 public interface CoinsBootstrap {
 
     CoinsPlugin getPlugin();
-
-    @Deprecated
-    CoinsConfig getPluginConfig();
 
     AbstractConfigFile getFileAsConfig(File file);
 
@@ -90,5 +86,5 @@ public interface CoinsBootstrap {
 
     Logger getLogger();
 
-    ProxyMessaging getBungeeMessaging();
+    ProxyMessaging getBungeeMessaging(CoinsPlugin coinsPlugin);
 }
