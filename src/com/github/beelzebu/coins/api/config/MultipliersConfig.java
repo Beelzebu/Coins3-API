@@ -35,23 +35,23 @@ public abstract class MultipliersConfig extends AbstractConfigFile {
     }
 
     public String getCommand() {
-        return getString("General.Command.Multiplier.Name", "multiplier");
+        return coinsPlugin.getConfig().getString("General.Command.Multiplier.Name", "multiplier");
     }
 
     public String getCommandDescription() {
-        return getString("General.Command.Multiplier.Description", "Command to see and edit multipliers");
+        return coinsPlugin.getConfig().getString("General.Command.Multiplier.Description", "Command to see and edit multipliers");
     }
 
     public String getCommandUsage() {
-        return getString("General.Command.Multiplier.Usage", "/multiplier");
+        return coinsPlugin.getConfig().getString("General.Command.Multiplier.Usage", "/multiplier");
     }
 
     public String getCommandPermission() {
-        return getString("General.Command.Multiplier.Permission", "coins.multiplier");
+        return coinsPlugin.getConfig().getString("General.Command.Multiplier.Permission", "coins.multiplier");
     }
 
     public List<String> getCommandAliases() {
-        return getStringList("General.Command.Multiplier.Aliases", Collections.emptyList());
+        return coinsPlugin.getConfig().getStringList("General.Command.Multiplier.Aliases", Collections.emptyList());
     }
 
 }
