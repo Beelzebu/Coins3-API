@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
-import java.util.logging.Logger;
 
 /**
  * @author Beelzebu
@@ -83,8 +82,6 @@ public interface CoinsBootstrap {
     void callMultiplierEnableEvent(Multiplier multiplier);
 
     List<String> getPermissions(UUID uuid);
-
-    Logger getLogger();
 
     ProxyMessaging getBungeeMessaging(CoinsPlugin coinsPlugin);
 }
