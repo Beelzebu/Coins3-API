@@ -83,5 +83,5 @@ public interface CoinsBootstrap {
 
     List<String> getPermissions(UUID uuid);
 
-    ProxyMessaging getBungeeMessaging(CoinsPlugin coinsPlugin);
+    ProxyMessaging getProxyMessaging();
 }
