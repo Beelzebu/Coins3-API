@@ -24,6 +24,7 @@ import com.github.beelzebu.coins.api.CoinsUser;
 import com.github.beelzebu.coins.api.Multiplier;
 import com.github.beelzebu.coins.api.MultiplierData;
 import com.github.beelzebu.coins.api.MultiplierType;
+import com.github.beelzebu.coins.api.plugin.CoinsBootstrap;
 import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.github.beelzebu.coins.api.storage.StorageProvider;
 import com.github.beelzebu.coins.api.storage.StorageType;
@@ -47,13 +48,13 @@ import javax.annotation.Nonnull;
  */
 public abstract class SQLDatabase implements StorageProvider {
 
-    protected final CoinsPlugin plugin;
+    protected final CoinsPlugin<? extends CoinsBootstrap> plugin;
     protected final String prefix;
     public static String DATA_TABLE;
     public static String MULTIPLIERS_TABLE;
     protected HikariDataSource ds;
 
-    public SQLDatabase(CoinsPlugin plugin) {
+    public SQLDatabase(CoinsPlugin<? extends CoinsBootstrap> plugin) {
         this.plugin = plugin;
         prefix = getStorageType().equals(StorageType.SQLITE) ? "" : plugin.getConfig().getString("MySQL.Prefix");
         DATA_TABLE = prefix + plugin.getConfig().getString("MySQL.Data Table", "data");

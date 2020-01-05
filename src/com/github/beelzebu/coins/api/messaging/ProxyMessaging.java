@@ -18,6 +18,7 @@
  */
 package com.github.beelzebu.coins.api.messaging;
 
+import com.github.beelzebu.coins.api.plugin.CoinsBootstrap;
 import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.google.gson.JsonObject;
 
@@ -31,7 +32,7 @@ public abstract class ProxyMessaging extends AbstractMessagingService {
      */
     protected static final String CHANNEL = "coins:updates";
 
-    public ProxyMessaging(CoinsPlugin coinsPlugin) {
+    public ProxyMessaging(CoinsPlugin<? extends CoinsBootstrap> coinsPlugin) {
         super(coinsPlugin);
     }
 
@@ -40,7 +41,7 @@ public abstract class ProxyMessaging extends AbstractMessagingService {
      */
     @Override
     public final MessagingServiceType getType() {
-        return MessagingServiceType.BUNGEECORD;
+        return MessagingServiceType.PROXY;
     }
 
     /**

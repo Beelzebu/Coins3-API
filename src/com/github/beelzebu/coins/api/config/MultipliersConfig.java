@@ -18,15 +18,16 @@
  */
 package com.github.beelzebu.coins.api.config;
 
+import com.github.beelzebu.coins.api.plugin.CoinsBootstrap;
 import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import java.util.Collections;
 import java.util.List;
 
 public abstract class MultipliersConfig extends AbstractConfigFile {
 
-    protected CoinsPlugin coinsPlugin;
+    protected CoinsPlugin<? extends CoinsBootstrap> coinsPlugin;
 
-    public MultipliersConfig(CoinsPlugin coinsPlugin) {
+    public MultipliersConfig(CoinsPlugin<? extends CoinsBootstrap> coinsPlugin) {
         this.coinsPlugin = coinsPlugin;
     }
 

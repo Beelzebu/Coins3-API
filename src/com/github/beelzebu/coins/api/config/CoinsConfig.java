@@ -37,7 +37,7 @@ public abstract class CoinsConfig extends AbstractConfigFile {
     }
 
     public boolean useBungee() {
-        return getMessagingServiceType().equals(MessagingServiceType.BUNGEECORD);
+        return getMessagingServiceType().equals(MessagingServiceType.PROXY);
     }
 
     public boolean isRedisLoadMultipliers() {

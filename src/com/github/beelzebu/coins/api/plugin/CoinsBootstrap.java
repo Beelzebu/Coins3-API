@@ -31,7 +31,7 @@ import java.util.UUID;
  */
 public interface CoinsBootstrap {
 
-    CoinsPlugin getPlugin();
+    CoinsPlugin<? extends CoinsBootstrap> getPlugin();
 
     AbstractConfigFile getFileAsConfig(File file);
 

@@ -35,7 +35,7 @@ import java.util.UUID;
 /**
  * @author Beelzebu
  */
-public interface CoinsPlugin {
+public interface CoinsPlugin <T extends CoinsBootstrap> {
 
     Gson GSON = new Gson();
 
@@ -47,7 +47,7 @@ public interface CoinsPlugin {
 
     void disable();
 
-    CoinsBootstrap getBootstrap();
+    T getBootstrap();
 
     CacheProvider getCache();
 

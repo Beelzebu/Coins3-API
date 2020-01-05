@@ -22,6 +22,7 @@ import com.github.beelzebu.coins.api.CoinsAPI;
 import com.github.beelzebu.coins.api.Multiplier;
 import com.github.beelzebu.coins.api.MultiplierData;
 import com.github.beelzebu.coins.api.MultiplierType;
+import com.github.beelzebu.coins.api.plugin.CoinsBootstrap;
 import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -164,9 +165,9 @@ public interface CacheProvider {
 
     class MultiplierPoller implements Runnable {
 
-        private final CoinsPlugin plugin;
+        private final CoinsPlugin<? extends CoinsBootstrap> plugin;
 
-        public MultiplierPoller(CoinsPlugin plugin) {
+        public MultiplierPoller(CoinsPlugin<? extends CoinsBootstrap> plugin) {
             this.plugin = plugin;
         }
 

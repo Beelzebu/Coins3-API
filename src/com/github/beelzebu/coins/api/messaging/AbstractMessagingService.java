@@ -22,6 +22,7 @@ import com.github.beelzebu.coins.api.CoinsAPI;
 import com.github.beelzebu.coins.api.Multiplier;
 import com.github.beelzebu.coins.api.executor.Executor;
 import com.github.beelzebu.coins.api.executor.ExecutorManager;
+import com.github.beelzebu.coins.api.plugin.CoinsBootstrap;
 import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.github.beelzebu.coins.api.storage.StorageType;
 import com.google.gson.JsonObject;
@@ -36,9 +37,9 @@ import java.util.UUID;
 @SuppressWarnings("unused")
 public abstract class AbstractMessagingService {
 
-    protected final CoinsPlugin coinsPlugin;
+    protected final CoinsPlugin<? extends CoinsBootstrap> coinsPlugin;
 
-    public AbstractMessagingService(CoinsPlugin coinsPlugin) {
+    public AbstractMessagingService(CoinsPlugin<? extends CoinsBootstrap> coinsPlugin) {
         this.coinsPlugin = coinsPlugin;
     }
 

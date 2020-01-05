@@ -19,6 +19,7 @@
 package com.github.beelzebu.coins.api;
 
 import com.github.beelzebu.coins.api.cache.CacheProvider;
+import com.github.beelzebu.coins.api.plugin.CoinsBootstrap;
 import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.github.beelzebu.coins.api.utils.CoinsEntry;
 import com.github.beelzebu.coins.api.utils.CoinsSet;
@@ -44,7 +45,7 @@ public final class CoinsAPI {
     private static final DecimalFormat DF = new DecimalFormat("#.#");
     private static final CoinsEntry<CoinsSet<CoinsUser>, Long> CACHED_TOP = new CoinsEntry<>(new CoinsSet<>(), -1L);
     private static final long TOP_CACHE_MILLIS = 30000;
-    private static CoinsPlugin PLUGIN = null;
+    private static CoinsPlugin<? extends CoinsBootstrap> PLUGIN = null;
 
     private CoinsAPI() {
     }
@@ -538,11 +539,11 @@ public final class CoinsAPI {
         return PLUGIN.getMultipliersConfig().getString("Server name", "default").toLowerCase();
     }
 
-    public static CoinsPlugin getPlugin() {
+    public static CoinsPlugin<? extends CoinsBootstrap> getPlugin() {
         return PLUGIN;
     }
 
-    public static void setPlugin(@Nonnull CoinsPlugin plugin) {
+    public static void setPlugin(@Nonnull CoinsPlugin<? extends CoinsBootstrap> plugin) {
         if (PLUGIN == null) {
             PLUGIN = plugin;
             plugin.getBootstrap().scheduleAsync(plugin.getCache().getMultiplierPoller(), CacheProvider.POLLER_INTERVAL_SECONDS * 20); // we must multiply it by 20 because interval is in ticks

@@ -23,6 +23,6 @@ package com.github.beelzebu.coins.api.messaging;
  */
 public enum MessagingServiceType {
     REDIS,
-    BUNGEECORD,
+    PROXY,
     NONE
 }
