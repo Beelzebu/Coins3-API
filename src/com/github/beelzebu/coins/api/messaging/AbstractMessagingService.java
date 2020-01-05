@@ -189,7 +189,7 @@ public abstract class AbstractMessagingService {
      * @param jsonObject JSON message received in the messaging service implementation.
      */
     protected final void handleMessage(JsonObject jsonObject) {
-        Message message = coinsPlugin.getGson().fromJson(jsonObject, Message.class);
+        Message message = CoinsPlugin.GSON.fromJson(jsonObject, Message.class);
         coinsPlugin.debug("&6Messaging: &7Handling message: " + jsonObject);
         switch (message.getType()) {
             case USER_UPDATE: {

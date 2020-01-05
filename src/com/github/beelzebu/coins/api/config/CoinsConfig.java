@@ -20,21 +20,15 @@ package com.github.beelzebu.coins.api.config;
 
 import com.github.beelzebu.coins.api.cache.CacheType;
 import com.github.beelzebu.coins.api.messaging.MessagingServiceType;
-import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.github.beelzebu.coins.api.storage.StorageType;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * @author Beelzebu
  */
 public abstract class CoinsConfig extends AbstractConfigFile {
-
-    protected CoinsPlugin coinsPlugin;
-
-    public CoinsConfig(CoinsPlugin coinsPlugin) {
-        this.coinsPlugin = coinsPlugin;
-    }
 
     // #EasterEgg
     // this can be enabled in minigame arenas where the only transaction is to add coins to players
@@ -43,7 +37,7 @@ public abstract class CoinsConfig extends AbstractConfigFile {
     }
 
     public boolean useBungee() {
-        return coinsPlugin.getMessagingService().getType().equals(MessagingServiceType.BUNGEECORD);
+        return getMessagingServiceType().equals(MessagingServiceType.BUNGEECORD);
     }
 
     public boolean isRedisLoadMultipliers() {
@@ -75,17 +69,17 @@ public abstract class CoinsConfig extends AbstractConfigFile {
         try {
             return StorageType.valueOf(getString("Storage Type", "sqlite").toUpperCase());
         } catch (IllegalArgumentException ex) {
-            coinsPlugin.log("You have defined a invalid storage type in the config.");
+            Logger.getLogger(CoinsConfig.class.getName()).warning("You have defined a invalid storage type in the config.");
         }
         return type;
     }
 
-    public MessagingServiceType getMessagingService() {
+    public MessagingServiceType getMessagingServiceType() {
         MessagingServiceType type = MessagingServiceType.NONE;
         try {
             return MessagingServiceType.valueOf(getString("Messaging Service", "none").toUpperCase());
         } catch (IllegalArgumentException ex) {
-            coinsPlugin.log("You have defined a invalid storage type in the config.");
+            Logger.getLogger(CoinsConfig.class.getName()).warning("You have defined a invalid storage type in the config.");
         }
         return type;
     }
@@ -95,7 +89,7 @@ public abstract class CoinsConfig extends AbstractConfigFile {
         try {
             return CacheType.valueOf(getString("Cache", "local").toUpperCase());
         } catch (IllegalArgumentException ex) {
-            coinsPlugin.log("You have defined a invalid cache type in the config.");
+            Logger.getLogger(CoinsConfig.class.getName()).warning("You have defined a invalid cache type in the config, using LOCAL as cache.");
         }
         return type;
     }

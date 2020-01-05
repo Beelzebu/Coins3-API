@@ -223,7 +223,16 @@ public interface CacheProvider {
         public void checkMultipliersForDisable() {
             // create a new set to avoid any ConcurrentModificationException
             new HashSet<>(plugin.getCache().getMultipliers()).stream()
-                    .filter(multiplier -> multiplier.getServer().equals(CoinsAPI.getServerName())) // filter multiplier by server
+                    .filter(Objects::nonNull)
+                    .filter(multiplier -> {
+                        UUID enabler = multiplier.getData().getEnablerUUID();
+                        if (!plugin.getBootstrap().isOnline(enabler) && !(multiplier.isEnabled() || multiplier.isQueue())) { // remove multipliers that won't be enabled
+                            plugin.getCache().deleteMultiplier(multiplier.getId());
+                            return false;
+                        }
+                        return true;
+                    })
+                    .filter(multiplier -> Objects.equals(multiplier.getServer(), CoinsAPI.getServerName())) // filter multiplier by server
                     .forEach(Multiplier::isEnabled); // check if multiplier is enabled, Multiplier#isEnabled will remove it from cache if is disabled
         }
     }

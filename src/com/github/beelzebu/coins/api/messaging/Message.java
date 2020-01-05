@@ -18,7 +18,7 @@
  */
 package com.github.beelzebu.coins.api.messaging;
 
-import com.github.beelzebu.coins.api.CoinsAPI;
+import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.google.gson.JsonObject;
 
 public class Message {
@@ -40,6 +40,6 @@ public class Message {
     }
 
     public JsonObject toJson() {
-        return CoinsAPI.getPlugin().getGson().toJsonTree(this).getAsJsonObject();
+        return CoinsPlugin.GSON.toJsonTree(this).getAsJsonObject();
     }
 }

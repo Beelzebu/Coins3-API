@@ -18,7 +18,7 @@
  */
 package com.github.beelzebu.coins.api.executor;
 
-import com.github.beelzebu.coins.api.CoinsAPI;
+import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import java.util.List;
@@ -57,11 +57,11 @@ public class Executor {
     }
 
     public static JsonObject toJson(Executor ex) {
-        return CoinsAPI.getPlugin().getGson().toJsonTree(ex).getAsJsonObject();
+        return CoinsPlugin.GSON.toJsonTree(ex).getAsJsonObject();
     }
 
     public static Executor fromJson(String json) throws JsonParseException {
-        return CoinsAPI.getPlugin().getGson().fromJson(json, Executor.class);
+        return CoinsPlugin.GSON.fromJson(json, Executor.class);
     }
 
     public JsonObject toJson() {

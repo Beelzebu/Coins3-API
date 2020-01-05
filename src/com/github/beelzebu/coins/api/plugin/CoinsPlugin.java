@@ -37,6 +37,8 @@ import java.util.UUID;
  */
 public interface CoinsPlugin {
 
+    Gson GSON = new Gson();
+
     void load();
 
     void enable();
@@ -65,7 +67,10 @@ public interface CoinsPlugin {
 
     void setMessagingServiceType(MessagingServiceType messagingServiceType);
 
-    Gson getGson();
+    @Deprecated
+    default Gson getGson() {
+        return GSON;
+    }
 
     void loadExecutors();
 

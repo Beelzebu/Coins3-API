@@ -63,7 +63,7 @@ public abstract class ProxyMessaging extends AbstractMessagingService {
      */
     @Override
     protected final void sendMessage(JsonObject jsonObject) {
-        Message message = coinsPlugin.getGson().fromJson(jsonObject, Message.class);
+        Message message = CoinsPlugin.GSON.fromJson(jsonObject, Message.class);
         sendMessage(jsonObject.toString(), message.getType() != MessageType.MULTIPLIER_ENABLE);
     }
 }

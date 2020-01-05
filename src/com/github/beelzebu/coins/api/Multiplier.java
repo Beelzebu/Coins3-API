@@ -18,6 +18,7 @@
  */
 package com.github.beelzebu.coins.api;
 
+import com.github.beelzebu.coins.api.plugin.CoinsPlugin;
 import com.github.beelzebu.coins.api.utils.StringUtils;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
@@ -93,7 +94,7 @@ public final class Multiplier {
         Objects.requireNonNull(multiplier, "Tried to load a null Multiplier");
         CoinsAPI.getPlugin().debug("Loading multiplier from JSON: " + multiplier);
         try {
-            return CoinsAPI.getPlugin().getGson().fromJson(multiplier, Multiplier.class);
+            return CoinsPlugin.GSON.fromJson(multiplier, Multiplier.class);
         } catch (JsonSyntaxException ex) {
             CoinsAPI.getPlugin().debug(ex);
         }
@@ -174,11 +175,11 @@ public final class Multiplier {
      * @return server for this multiplier in lowercase.
      */
     public String getServer() {
-        return data.getType() == MultiplierType.GLOBAL ? CoinsAPI.getServerName() : server;
+        return Objects.requireNonNull(data.getType() == MultiplierType.GLOBAL ? CoinsAPI.getServerName() : server, "server can't be null");
     }
 
     public JsonObject toJson() {
-        return CoinsAPI.getPlugin().getGson().toJsonTree(this).getAsJsonObject();
+        return CoinsPlugin.GSON.toJsonTree(this).getAsJsonObject();
     }
 
     private long getAndCheckRemainingMillis() {

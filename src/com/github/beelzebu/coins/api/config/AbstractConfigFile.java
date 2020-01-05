@@ -21,6 +21,7 @@ package com.github.beelzebu.coins.api.config;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Logger;
 
 /**
  * @author Beelzebu
@@ -35,7 +36,7 @@ public abstract class AbstractConfigFile {
     }
 
     public List<String> getStringList(String path) {
-        return get(path) != null ? (List<String>) get(path) : new ArrayList<>();
+        return get(path, List.class) != null ? get(path, List.class) : new ArrayList<>();
     }
 
     public boolean getBoolean(String path) {
@@ -43,38 +44,48 @@ public abstract class AbstractConfigFile {
     }
 
     public int getInt(String path) {
-        return get(path) instanceof Number ? ((Number) get(path)).intValue() : -1;
+        return get(path, int.class) instanceof Number ? ((Number) get(path, int.class)).intValue() : -1;
     }
 
     public double getDouble(String path) {
-        return get(path) instanceof Number ? ((Number) get(path)).doubleValue() : -1;
+        return get(path, double.class) instanceof Number ? ((Number) get(path, double.class)).doubleValue() : -1;
     }
 
     public Object get(String path, Object def) {
-        return get(path) != null ? get(path) : def;
+        return get(path, def.getClass()) != null ? get(path, def.getClass()) : def;
     }
 
     public String getString(String path, String def) {
-        return get(path) != null ? (String) get(path) : def;
+        return get(path, String.class) != null ? get(path, String.class) : def;
     }
 
     public List<String> getStringList(String path, List<String> def) {
-        return get(path) != null ? getStringList(path) : def;
+        return get(path, List.class) != null ? getStringList(path) : def;
     }
 
     public boolean getBoolean(String path, boolean def) {
-        return get(path) != null ? (boolean) get(path) : def;
+        return get(path, boolean.class) != null ? get(path, boolean.class) : def;
     }
 
     public int getInt(String path, int def) {
-        return get(path) != null ? getInt(path) : def;
+        return get(path, int.class) != null ? getInt(path) : def;
     }
 
     public double getDouble(String path, double def) {
-        return get(path) != null ? getDouble(path) : def;
+        return get(path, double.class) != null ? getDouble(path) : def;
     }
 
     public abstract Object get(String path);
+
+    public <T> T get(String path, Class<? extends T> type) {
+        Object value = get(path);
+        try {
+            return (T) value;
+        } catch (ClassCastException e) {
+            Logger.getLogger(AbstractConfigFile.class.getName()).info("There is an error reading value for " + path + " expected: " + type + " found: " + value.getClass());
+        }
+        return null;
+    }
 
     public abstract Set<String> getConfigurationSection(String path);
 

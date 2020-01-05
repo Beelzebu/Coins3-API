@@ -72,7 +72,9 @@ public final class CoinsAPI {
     public static double getCoins(@Nonnull UUID uuid) {
         OptionalDouble optionalCoins = PLUGIN.getCache().getCoins(uuid);
         if (!optionalCoins.isPresent()) { // send coins to other servers and cache
-            PLUGIN.getMessagingService().publishUser(uuid, PLUGIN.getStorageProvider().getCoins(uuid));
+            double coins = PLUGIN.getStorageProvider().getCoins(uuid);
+            PLUGIN.getMessagingService().publishUser(uuid, coins);
+            PLUGIN.getCache().updatePlayer(uuid, coins);
         }
         // try again to get coins from cache, otherwise fallback to database
         return PLUGIN.getCache().getCoins(uuid).orElseGet(() -> {
@@ -532,6 +534,7 @@ public final class CoinsAPI {
      * @return Server name from {@link CoinsPlugin#getMultipliersConfig()}
      */
     public static String getServerName() {
+        Objects.requireNonNull(PLUGIN.getMultipliersConfig(), "multipliers config can't be null");
         return PLUGIN.getMultipliersConfig().getString("Server name", "default").toLowerCase();
     }
 
