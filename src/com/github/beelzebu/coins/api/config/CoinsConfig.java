@@ -40,10 +40,6 @@ public abstract class CoinsConfig extends AbstractConfigFile {
         return getMessagingServiceType().equals(MessagingServiceType.PROXY);
     }
 
-    public boolean isRedisLoadMultipliers() {
-        return getBoolean("Redis.Load Multipliers", true);
-    }
-
     public String getCommand() {
         return getString("General.Command.Coins.Name", "coins");
     }
